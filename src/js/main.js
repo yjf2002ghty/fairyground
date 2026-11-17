@@ -221,6 +221,7 @@ const searchresultinfo = document.getElementById("searchresultinfo");
 const dropdownNotationSystem = document.getElementById("sannotation");
 const pRandomMoverGo = document.getElementById("randommovergo");
 const pBoardOrientation = document.getElementById("boardorientation");
+const buttonSetEvaluation = document.getElementById("seteval");
 
 // Compact number formatting for the engine statistics (1.2M, 850k).
 function formatCount(value) {
@@ -1232,7 +1233,7 @@ class GameTree {
       initialmovenumber = 1;
     }
     this.MoveTree.SetInitialCondition(initialmovenumber, initialmoverround, 2);
-    let tokens = this.MoveTree.ToPGNTokens(2);
+    let tokens = this.MoveTree.ToPGNTokens(2).slice(1);
     console.log(this.MoveTree);
     let i = 0;
     let tmpboard = new ffish.Board(this.Variant, this.OriginalFEN, this.Is960);
@@ -1366,69 +1367,10 @@ class GameTree {
     let displaytextafter = "";
     let lastmainlinemove = this.MoveTree.RootNode;
     let terminationstr;
+    let evalstr = "";
     let movesparagraph = document.createElement("div");
     movesparagraph.id = "pgndiv";
     movesparagraph.classList.add("board-display-san");
-
-    if (lastmainlinemove.Move.TextAfter) {
-      let result = getBoardResult(tmpboard);
-      let termination = null;
-      if (result != "*") {
-        if (lastmainlinemove.Move.TextAfter.includes("[%end ")) {
-          element = document.createElement("p");
-          element.textContent =
-            result +
-            ": " +
-            FriendlyGameTerminationNames[
-              FriendlyGameTerminationNames.length - 1
-            ];
-          element.classList.add("marked-result");
-          movesparagraph.appendChild(element);
-        }
-      } else {
-        index = lastmainlinemove.Move.TextAfter.indexOf("[%end ");
-        if (index >= 0) {
-          indexend = lastmainlinemove.Move.TextAfter.indexOf("]", index + 6);
-          if (indexend >= 0) {
-            terminationstr = lastmainlinemove.Move.TextAfter.substring(
-              index + 6,
-              indexend,
-            ).split(",");
-            if (
-              GameResults.includes(terminationstr[0]) &&
-              GameTerminations.includes(terminationstr[1])
-            ) {
-              result = terminationstr[0];
-              termination = terminationstr[1];
-              element = document.createElement("p");
-              element.textContent =
-                result +
-                ": " +
-                FriendlyGameTerminationNames[
-                  GameTerminations.indexOf(termination)
-                ];
-              element.classList.add("marked-result");
-              movesparagraph.appendChild(element);
-            }
-          }
-        }
-      }
-      displaytextafter = lastmainlinemove.Move.TextAfter.replace(
-        MoveTextActionPartsMatcher,
-        "",
-      );
-      if (CompleteBlankStringMatcher.test(displaytextafter)) {
-        displaytextafter = "";
-      } else {
-        element = document.createElement("p");
-        element.textContent = displaytextafter;
-        element.classList.add("text-after");
-        if (lastmainlinemove.Move.TextAfter.includes("\n")) {
-          element.style.width = "100%";
-        }
-        movesparagraph.appendChild(element);
-      }
-    }
 
     for (i = 0; i < tokens.length; i++) {
       if (tokens[i].IsSplitter) {
@@ -1472,7 +1414,7 @@ class GameTree {
         if (hidesubsequentmovelevel > 0) {
           continue;
         }
-        if (tokens[i].Move.TextBefore) {
+        if (i > 0 && tokens[i].Move.TextBefore) {
           displaytextbefore = tokens[i].Move.TextBefore.replace(
             MoveTextActionPartsMatcher,
             "",
@@ -1492,8 +1434,8 @@ class GameTree {
           displaytextbefore = "";
         }
         if (
-          i == 0 ||
-          (i > 0 && (tokens[i - 1].IsSplitter || displaytextafter)) ||
+          i == 1 ||
+          (i > 1 && (tokens[i - 1].IsSplitter || displaytextafter)) ||
           displaytextbefore
         ) {
           if (tokens[i].Move.MoverRound == 0) {
@@ -1509,66 +1451,90 @@ class GameTree {
             element.classList.add("move-number");
             movesparagraph.appendChild(element);
           }
-        } else if (tokens[i].Move.MoverRound == 0) {
+        } else if (i > 0 && tokens[i].Move.MoverRound == 0) {
           element = document.createElement("p");
           element.textContent =
             Math.ceil(tokens[i].Move.HalfMoveNumber / 2) + ".";
           element.classList.add("move-number");
           movesparagraph.appendChild(element);
         }
-        move = moveutil.ParseUCIMove(tokens[i].Move.Move);
-        moveelement = document.createElement("p");
-        moveelement.textContent = tmpboard.sanMove(
-          tokens[i].Move.Move,
-          Notation,
-        );
-        for (j = 0; j < tokens[i].Move.Symbol.length; j++) {
-          glyph = parseInt(tokens[i].Move.Symbol[j].substring(1));
-          if (moveutil.NumericAnnotationGlyphs[glyph]) {
-            moveelement.textContent +=
-              (j == 0 ? "" : " ") + moveutil.NumericAnnotationGlyphs[glyph];
-          }
-        }
-        tmpboard.push(tokens[i].Move.Move);
-        movestack.push(tokens[i].Move.Move);
-        gameresult = getBoardResult(tmpboard);
-        moveelement.classList.add("position-display-label");
-        moveelement.fenstr = tmpboard.fen();
-        if (move[0].includes("@")) {
-          moveelement.lastmove = [
-            move[0],
-            convertSquareToChessgroundXKey(move[1]),
-          ];
+        if (i == 0) {
+          gameresult = getBoardResult(tmpboard);
         } else {
-          moveelement.lastmove = [
-            convertSquareToChessgroundXKey(move[0]),
-            convertSquareToChessgroundXKey(move[1]),
-          ];
-        }
-        moveelement.moveturn = tmpboard.turn() ? "white" : "black";
-        moveelement.checked = getCheckSquares(tmpboard);
-        moveelement.gameresult = gameresult;
-        moveelement.startingfen = this.OriginalFEN;
-        moveelement.moves = movestack.join(" ");
-        if (tokens[i].Node == this.CurrentMove) {
-          moveelement.classList.add("current-move");
-          moveelement.title = "This is current move.";
-        }
-        ((this_element) => {
-          this_element.onclick = () => {
-            if (isGameStarted.checked) {
-              onMoveElementClicked(this_element);
+          move = moveutil.ParseUCIMove(tokens[i].Move.Move);
+          moveelement = document.createElement("p");
+          moveelement.textContent = tmpboard.sanMove(
+            tokens[i].Move.Move,
+            Notation,
+          );
+          for (j = 0; j < tokens[i].Move.Symbol.length; j++) {
+            glyph = parseInt(tokens[i].Move.Symbol[j].substring(1));
+            if (moveutil.NumericAnnotationGlyphs[glyph]) {
+              moveelement.textContent +=
+                (j == 0 ? "" : " ") + moveutil.NumericAnnotationGlyphs[glyph];
             }
-          };
-        })(moveelement);
-        movesparagraph.appendChild(moveelement);
+          }
+          tmpboard.push(tokens[i].Move.Move);
+          movestack.push(tokens[i].Move.Move);
+          gameresult = getBoardResult(tmpboard);
+          moveelement.classList.add("position-display-label");
+          moveelement.fenstr = tmpboard.fen();
+          if (move[0].includes("@")) {
+            moveelement.lastmove = [
+              move[0],
+              convertSquareToChessgroundXKey(move[1]),
+            ];
+          } else {
+            moveelement.lastmove = [
+              convertSquareToChessgroundXKey(move[0]),
+              convertSquareToChessgroundXKey(move[1]),
+            ];
+          }
+          moveelement.moveturn = tmpboard.turn() ? "white" : "black";
+          moveelement.checked = getCheckSquares(tmpboard);
+          moveelement.gameresult = gameresult;
+          moveelement.startingfen = this.OriginalFEN;
+          moveelement.moves = movestack.join(" ");
+          if (tokens[i].Node == this.CurrentMove) {
+            moveelement.classList.add("current-move");
+            moveelement.title = "This is current move.";
+          }
+          ((this_element) => {
+            this_element.onclick = () => {
+              if (isGameStarted.checked) {
+                onMoveElementClicked(this_element);
+              }
+            };
+          })(moveelement);
+          movesparagraph.appendChild(moveelement);
+        }
         if (tokens[i].Move.TextAfter) {
           parsedtext = moveutil.ParseTextActions(tokens[i].Move.TextAfter);
           boardmarkers =
             (parsedtext.get("cal") ?? "") + "," + (parsedtext.get("csl") ?? "");
           terminationstr = (parsedtext.get("end") ?? "").split(",");
+          evalstr = parsedtext.get("eval") ?? "";
+          if (evalstr) {
+            element = document.createElement("p");
+            element.textContent = evalstr;
+            element.classList.add("evaluation-text");
+            if (evalstr.startsWith("#")) {
+              element.title = getEvaluationDescription(
+                parseFloat(evalstr.substring(1)),
+                true,
+              );
+            } else {
+              element.title = getEvaluationDescription(
+                parseFloat(evalstr),
+                false,
+              );
+            }
+            movesparagraph.appendChild(element);
+          }
           if (boardmarkers.length > 1) {
-            moveelement.boardmarkers = boardmarkers;
+            if (i > 0) {
+              moveelement.boardmarkers = boardmarkers;
+            }
             element = document.createElement("img");
             element.src = "./assets/images/pgn/colorring.svg";
             element.width = "20";
@@ -1595,7 +1561,9 @@ class GameTree {
               GameResults.includes(terminationstr[0]) &&
               GameTerminations.includes(terminationstr[1])
             ) {
-              moveelement.gameresult = terminationstr[0];
+              if (i > 0) {
+                moveelement.gameresult = terminationstr[0];
+              }
               element = document.createElement("p");
               element.textContent =
                 terminationstr[0] +
@@ -1719,8 +1687,8 @@ document.dispatchEvent(new Event("onpageload"));
 function getEvaluationDescription(eval_num, is_mate) {
   const better_side = eval_num > 0 ? "First" : eval_num < 0 ? "Second" : "none";
   const score = Math.abs(eval_num);
-  if (better_side == "none") {
-    return "The position is equal";
+  if (isNaN(eval_num)) {
+    return "Invalid evaluation";
   }
   if (is_mate) {
     if (eval_num == 0) {
@@ -2520,7 +2488,7 @@ function parseBoardMarkers(boardmarkers, movercolor) {
   };
 }
 
-//This function must be called as onclick() function of a HTMLElement
+//This function can be called as onclick() function of a HTMLElement
 function onMoveElementClicked(moveelement) {
   let this_element = moveelement;
   if (!(moveelement instanceof HTMLElement)) {
@@ -3920,6 +3888,7 @@ new Module().then((loadedModule) => {
     ffish.Notation.THAI_LAN,
   ];
   const singleblankmatcher = new RegExp("[ ]+");
+  let last_evaluation = "";
 
   variantsIni.onchange = function (e) {
     const selected = e.currentTarget.files[0];
@@ -5072,6 +5041,8 @@ new Module().then((loadedModule) => {
         evaluationBar.style.width = "100%";
         evalscore.innerText = "Checkmate";
       }
+      last_evaluation = "#0";
+      evalcomment.textContent = getEvaluationDescription(0, true);
       return;
     } else {
       return;
@@ -5098,10 +5069,12 @@ new Module().then((loadedModule) => {
       } else {
         if (matemoves > 0) {
           evaluationBar.style.width = "100%";
-          evalscore.textContent = "Mate in " + matemoves.toString();
+          evalscore.textContent = `Mate in ${matemoves}`;
+          last_evaluation = `#+${matemoves}`;
         } else if (matemoves < 0) {
           evaluationBar.style.width = "0%";
-          evalscore.textContent = "Mate in " + (-1 * matemoves).toString();
+          evalscore.textContent = `Mate in ${-matemoves}`;
+          last_evaluation = `#${matemoves}`;
         } else {
           if (board.turn()) {
             evaluationBar.style.width = "0%";
@@ -5110,6 +5083,7 @@ new Module().then((loadedModule) => {
             evaluationBar.style.width = "100%";
             evalscore.textContent = "Checkmate";
           }
+          last_evaluation = "#0";
         }
         evalcomment.textContent = getEvaluationDescription(matemoves, true);
       }
@@ -5121,17 +5095,17 @@ new Module().then((loadedModule) => {
         evalcomment.textContent = "The evaluation is invalid";
       } else {
         if (evaluation > 0) {
-          evalscore.textContent = "+" + evaluation.toFixed(2).toString();
+          evalscore.textContent = last_evaluation =
+            "+" + evaluation.toFixed(2).toString();
         } else {
-          evalscore.textContent = evaluation.toFixed(2);
+          evalscore.textContent = last_evaluation = evaluation.toFixed(2);
         }
         if (evaluation <= -9.8) {
           evaluationBar.style.width = "1%";
         } else if (evaluation >= 9.8) {
           evaluationBar.style.width = "99%";
         } else {
-          evaluationBar.style.width =
-            parseInt((evaluation * 100 + 1000) / 20).toString() + "%";
+          evaluationBar.style.width = `${parseInt((evaluation * 100 + 1000) / 20)}%`;
         }
         evalcomment.textContent = getEvaluationDescription(evaluation, false);
       }
@@ -5543,6 +5517,15 @@ new Module().then((loadedModule) => {
 
   buttonPgnTextCancel.onclick = function () {
     pgnText.classList.add("hidden");
+  };
+
+  buttonSetEvaluation.onclick = function () {
+    if (gametree.CurrentMove.Move.TextAfter.includes("[%eval")) {
+      gametree.CurrentMove.Move.TextAfter =
+        gametree.CurrentMove.Move.TextAfter.replace(/\[\%eval.*?\]/g, "");
+    }
+    gametree.CurrentMove.Move.TextAfter += `[%eval ${last_evaluation}]`;
+    updatePGNDivision();
   };
 
   updateInnerCoordinateColor(chessground);

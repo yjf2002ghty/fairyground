@@ -892,7 +892,9 @@ export class MoveTree {
     if (TotalMoverCount < 2) {
       throw RangeError("Total mover count must be greater than or equal to 2.");
     }
-    let result = [];
+    let result = [
+      new MoveTreeNodeMovePair(this.RootNode, this.RootNode.Move, false),
+    ];
     let depth = 0;
     let startmovenumber = this.InitialHalfMoveNumber;
     let initialmoverround = this.InitialMoverRound;
@@ -938,7 +940,7 @@ export class MoveTree {
     }
     Traverse(this.RootNode);
     result.pop();
-    return result.filter((value) => value instanceof MoveTreeNodeMovePair);
+    return result;
   }
 
   ToString() {

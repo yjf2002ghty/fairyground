@@ -1686,6 +1686,12 @@ button.inioption {
   padding: 0 4px;
 }
 
+#pgndiv .evaluation-text {
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+
 .splitter.mainline {
   width: 100%;
 }
@@ -1797,6 +1803,13 @@ button.inioption {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.analysisbar > div {
+  display: flex;
+  align-items: center;
   gap: 10px;
   flex-wrap: wrap;
 }
