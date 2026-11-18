@@ -2900,6 +2900,37 @@ div.popup textarea {
   user-select: none;
 }
 
+/* ---------- evaluation history graph ---------- */
+
+#evalhistorycontainer {
+  height: 100px;
+  position: relative;
+}
+
+.eval-history-description {
+  position: absolute;
+  background: var(--surface2);
+  color: var(--text);
+  padding: 3px;
+  border: 1px solid var(--border2);
+  border-radius: var(--r);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.eval-history-point-container, .eval-history-canvas {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: transparent;
+}
+
+.eval-history-point {
+  position: absolute;
+  background: transparent;
+}
+
 /* ---------- legacy hooks kept for compatibility ---------- */
 
 .ripple {

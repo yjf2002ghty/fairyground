@@ -553,6 +553,9 @@
           if (localStorage.getItem("ShowMovesDialog") == "true") {
             document.getElementById("showmovediv").click();
           }
+          if (localStorage.getItem("ShowEvaluationHistoryGraph") == "true") {
+            document.getElementById("showevalgraph").click();
+          }
           document.getElementById("range-volume").value =
             localStorage.getItem("SoundVolume") || 1;
           document
@@ -2203,6 +2206,8 @@
         let use_integer_inputs = false;
 
         let mover_color_scheme = "chess";
+
+        let show_evaluation_history_graph = false;
 
         const default_start_time = 300000;
         const default_time_increment = 3000;
@@ -7188,6 +7193,9 @@
                   e.preventDefault();
                 },
               }),
+              m("div#evalhistorycontainer", {
+                hidden: !show_evaluation_history_graph,
+              }),
               m(
                 "div#pgn-operation-container.pgntools",
                 { hidden: !advanced_pgn_mode || game_started },
@@ -10866,6 +10874,31 @@
                             localStorage.setItem(
                               "ShowMovesDialog",
                               select_move_dialog,
+                            );
+                          },
+                        }),
+                      ],
+                    ),
+                    m(
+                      "div.setting",
+                      {
+                        title:
+                          "When checked, display evaluation history graph under move list panel.",
+                      },
+                      [
+                        m(
+                          "span",
+
+                          "Show evaluation history graph",
+                        ),
+                        m("input[type=checkbox]#showevalgraph", {
+                          checked: show_evaluation_history_graph,
+                          onclick: () => {
+                            show_evaluation_history_graph =
+                              !show_evaluation_history_graph;
+                            localStorage.setItem(
+                              "ShowEvaluationHistoryGraph",
+                              show_evaluation_history_graph,
                             );
                           },
                         }),

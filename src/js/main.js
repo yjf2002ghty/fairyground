@@ -8,6 +8,11 @@ import * as pgnutil from "./pgn.js";
 import * as imageutil from "./image.js";
 import * as themeutil from "./chessgroundtheme.js";
 import * as myvariants from "./myVariants.js";
+import * as evalhistory from "./evalhistory.js";
+
+if (typeof m == "undefined") {
+  throw Error("Mithril.js from <script> in index.html cannot be accessed!!!");
+}
 
 const divMain = document.getElementsByTagName("main")[0];
 const variantsIni = document.getElementById("variants-ini");
@@ -222,6 +227,8 @@ const dropdownNotationSystem = document.getElementById("sannotation");
 const pRandomMoverGo = document.getElementById("randommovergo");
 const pBoardOrientation = document.getElementById("boardorientation");
 const buttonSetEvaluation = document.getElementById("seteval");
+const evalHistoryContainer = document.getElementById("evalhistorycontainer");
+const checkboxShowEvalHistoryGraph = document.getElementById("showevalgraph");
 
 // Compact number formatting for the engine statistics (1.2M, 850k).
 function formatCount(value) {
@@ -416,6 +423,8 @@ const chessgroundnotations = [
 ];
 const MoveTextActionPartsMatcher = new RegExp("\\[.*?\\]", "g");
 const CompleteBlankStringMatcher = new RegExp("^\\s*$", "");
+const MoveNumberMatcher = new RegExp("\\d+\\.+", "g");
+const SpaceSplitterMatcher = new RegExp("[ ]+", "");
 const GameResults = ["1-0", "0-1", "1/2-1/2", "*"];
 const GameTerminations = [
   "undefined",
@@ -895,10 +904,10 @@ class GameTree {
     let pointer = MoveNode;
     let moves = [];
     while (pointer != this.MoveTree.RootNode) {
-      moves.unshift(pointer.Move.Move);
+      moves.push(pointer.Move.Move);
       pointer = pointer.PreviousNode;
     }
-    return moves.join(" ");
+    return moves.reverse().join(" ");
   }
 
   GetCompleteMainLineMoveListOfMove(MoveNode) {
@@ -911,9 +920,10 @@ class GameTree {
       if (pointer == null) {
         return null;
       }
-      moves.unshift(pointer.Move.Move);
+      moves.push(pointer.Move.Move);
       pointer = pointer.PreviousNode;
     }
+    moves.reverse();
     pointer = MoveNode;
     while (pointer.NextNodes[0]) {
       pointer = pointer.NextNodes[0];
@@ -1047,11 +1057,11 @@ class GameTree {
     this.UpdateHistory();
     this.MoveTree.RootNode.Move.TextAfter = pointer.Move.TextAfter;
     while (pointer != this.MoveTree.RootNode) {
-      moves.unshift(pointer.Move.Move);
+      moves.push(pointer.Move.Move);
       pointer = pointer.PreviousNode;
     }
     if (moves.length > 0) {
-      tmpboard.pushMoves(moves.join(" "));
+      tmpboard.pushMoves(moves.reverse().join(" "));
     }
     this.OriginalFEN = tmpboard.fen();
     this.MoveTree.RootNode.NextNodes = [this.CurrentMove];
@@ -1219,6 +1229,76 @@ class GameTree {
     }
     tmpboard.delete();
     return result.join("\n");
+  }
+
+  ForEachMove(Callback) {
+    if (typeof Callback != "function") {
+      throw TypeError();
+    }
+    let pointer = this.MoveTree.RootNode;
+    let stack = [];
+    let i = 0;
+    while (true) {
+      if (i < pointer.NextNodes.length) {
+        stack.push(i);
+        pointer = pointer.NextNodes[i];
+        i = 0;
+      } else {
+        Callback(pointer.Move, pointer, stack.slice());
+        if (stack.length == 0) {
+          break;
+        }
+        i = stack.pop() + 1;
+        pointer = pointer.PreviousNode;
+      }
+    }
+  }
+
+  ForEachMoveUntilMove(MoveNode, Callback) {
+    if (
+      !(MoveNode instanceof moveutil.MoveTreeNode) ||
+      typeof Callback != "function"
+    ) {
+      throw TypeError();
+    }
+    let pointer = MoveNode;
+    let moves = [];
+    let i = 0;
+    while (pointer.PreviousNode) {
+      moves.push(pointer);
+      pointer = pointer.PreviousNode;
+    }
+    moves.push(this.MoveTree.RootNode);
+    moves.reverse();
+    for (i = 0; i < moves.length; i++) {
+      Callback(moves[i].Move, moves[i]);
+    }
+  }
+
+  ForEachMoveOnBranchOfMove(MoveNode, Callback) {
+    if (
+      !(MoveNode instanceof moveutil.MoveTreeNode) ||
+      typeof Callback != "function"
+    ) {
+      throw TypeError();
+    }
+    let pointer = MoveNode;
+    let moves = [];
+    let i = 0;
+    while (pointer.PreviousNode) {
+      moves.push(pointer);
+      pointer = pointer.PreviousNode;
+    }
+    moves.push(this.MoveTree.RootNode);
+    moves.reverse();
+    pointer = MoveNode;
+    while (pointer.NextNodes[0]) {
+      pointer = pointer.NextNodes[0];
+      moves.push(pointer);
+    }
+    for (i = 0; i < moves.length; i++) {
+      Callback(moves[i].Move, moves[i]);
+    }
   }
 
   ToString(Notation, AlwaysShowResult) {
@@ -1657,6 +1737,9 @@ let multipvminiboardhandler = new MultiplePrincipalVariationMiniBoardHandler();
 let gametree = new GameTree();
 let themedetector = new themeutil.ChessgroundThemeDetector(
   chessgroundThemeDetector,
+);
+let evalhistorygraph = new evalhistory.EvaluationHistoryGraph(
+  evalHistoryContainer,
 );
 
 document.addEventListener("themechange", (event) => {
@@ -7151,6 +7234,52 @@ function DisplayLastMoveWithVisualEffect(
   }
 }
 
+function DrawEvaluationHistoryGraph() {
+  let notation_index = simplenotations.indexOf(
+    dropdownNotationSystem[dropdownNotationSystem.selectedIndex].value,
+  );
+  let notation = ffishnotationobjects[notation_index < 0 ? 2 : notation_index];
+  let tmpboard = new ffish.Board(
+    gametree.Variant,
+    gametree.OriginalFEN,
+    gametree.Is960,
+  );
+  let moves = gametree.GetCompleteMainLineMoveListOfMove(gametree.CurrentMove);
+  let moves_san = tmpboard
+    .variationSan(moves, notation)
+    .replace(MoveNumberMatcher, "")
+    .trim()
+    .split(SpaceSplitterMatcher);
+  let eval_score_list = [];
+  let move_number = -1;
+  let passed_current_move = false;
+  if (moves_san[0] != "") {
+    moves_san.unshift("");
+  }
+  gametree.ForEachMoveOnBranchOfMove(gametree.CurrentMove, (move) => {
+    if (move instanceof moveutil.Move) {
+      if (!passed_current_move) {
+        move_number++;
+      }
+      if (move == gametree.CurrentMove.Move) {
+        passed_current_move = true;
+      }
+      let index = move.TextAfter.indexOf("[%eval ");
+      if (index >= 0) {
+        let index2 = move.TextAfter.indexOf("]", index + 7);
+        if (index2 >= 0) {
+          eval_score_list.push(move.TextAfter.substring(index + 7, index2));
+          return;
+        }
+      }
+      eval_score_list.push("");
+    }
+  });
+  evalhistorygraph.SetEvaluationHistory(eval_score_list, moves_san);
+  evalhistorygraph.SetCurrentIndex(move_number);
+  evalhistorygraph.Draw();
+}
+
 function updatePGNDivisionTimeoutCheck() {
   if (PgnDivCalledDuringThrottle) {
     updatePGNDivision(true);
@@ -7170,6 +7299,9 @@ function updatePGNDivision(forceupdate = false) {
       labelPgn.appendChild(getPgnDiv(board));
     } else {
       labelPgn.innerText = getPgn(board);
+    }
+    if (checkboxShowEvalHistoryGraph.checked) {
+      DrawEvaluationHistoryGraph();
     }
     setTimeout(() => {
       let tmp = deletelater;
