@@ -1,6 +1,5 @@
 const EVAL_END = 1 / 0;
 const EVAL_UNKNOWN = -1 / 0;
-const EVAL_BAD = 0 / 0;
 
 const POINT_TYPE_VALID = 0;
 const POINT_TYPE_UNKNOWN = 1;
@@ -32,24 +31,23 @@ export class EvaluationHistoryGraph {
     this.DescriptionElement = document.createElement("pre");
     this.DescriptionElement.classList.add("eval-history-description");
     this.DescriptionElement.classList.add("inaccessable");
-    this.DescriptionElement.hidden = true;
+    this.DescriptionElement.style.opacity = "0";
     this.PointsContainer.appendChild(this.DescriptionElement);
     this.PointElements = [];
     this.CurrentIndex = 0;
     this.Canvas.width = this.Width = parseFloat(container_style.width);
     this.Canvas.height = this.Height = parseFloat(container_style.height);
     this.OnResizeCallback = this.OnResize.bind(this);
+    this.HideDescriptionCallback = this.HideDescription.bind(this);
     Container.appendChild(this.Canvas);
     Container.appendChild(this.PointsContainer);
-    this.PointsContainer.addEventListener(
-      "click",
-      this.HideDescription.bind(this),
-    );
+    document.addEventListener("click", this.HideDescriptionCallback);
     window.addEventListener("resize", this.OnResizeCallback);
   }
 
   destructor() {
     window.removeEventListener("resize", this.OnResizeCallback);
+    document.addEventListener("click", this.HideDescriptionCallback);
   }
 
   OnResize() {
@@ -120,15 +118,19 @@ export class EvaluationHistoryGraph {
     ) {
       throw TypeError();
     }
-    this.DescriptionElement.hidden = false;
+    this.DescriptionElement.style.opacity = "1";
+    this.DescriptionElement.textContent = Description;
     const style = window.getComputedStyle(this.DescriptionElement);
     this.DescriptionElement.style.left = `${X - parseFloat(style.width) / 2}px`;
     this.DescriptionElement.style.top = `${Y + 4 * this.PointSize}px`;
-    this.DescriptionElement.textContent = Description;
   }
 
-  HideDescription() {
-    this.DescriptionElement.hidden = true;
+  HideDescription(event) {
+    if (event instanceof PointerEvent) {
+      if (event.isTrusted) {
+        this.DescriptionElement.style.opacity = "0";
+      }
+    }
   }
 
   Draw() {
@@ -136,7 +138,7 @@ export class EvaluationHistoryGraph {
     this.Canvas.width = this.Width = parseFloat(container_style.width);
     this.Canvas.height = this.Height = parseFloat(container_style.height);
     this.CanvasContext.clearRect(0, 0, this.Width, this.Height);
-    this.DescriptionElement.hidden = true;
+    this.DescriptionElement.style.opacity = "0";
     const root_style = window.getComputedStyle(document.querySelector(":root"));
     const point_positions = [];
     const point_types = [];
@@ -149,6 +151,8 @@ export class EvaluationHistoryGraph {
     const zero_y = this.MaxEvaluationScore * resize_factor + this.Padding;
     const color = root_style.getPropertyValue("--accent");
     const bad_color = root_style.getPropertyValue("--bad");
+    const grid_color = root_style.getPropertyValue("--border2");
+    const grid_pitch = (this.Height - 2 * this.Padding) / 4;
     let i = 0;
     let offset_x = this.Padding;
     let score = 0;
@@ -156,12 +160,42 @@ export class EvaluationHistoryGraph {
     let eval_str = "";
     let point_type = 0;
     let elem;
+
+    // Draw the grid
+    this.CanvasContext.setLineDash([]);
+    // Zero evaluation score line
+    this.CanvasContext.beginPath();
+    this.CanvasContext.strokeStyle = grid_color;
+    this.CanvasContext.lineWidth = this.PointSize / 2;
+    this.CanvasContext.setLineDash([]);
+    this.CanvasContext.moveTo(this.Padding, zero_y);
+    this.CanvasContext.lineTo(this.Width, zero_y);
+    this.CanvasContext.stroke();
+    // Left border
+    this.CanvasContext.beginPath();
+    this.CanvasContext.strokeStyle = grid_color;
+    this.CanvasContext.lineWidth = this.PointSize / 2;
+    this.CanvasContext.moveTo(this.Padding, this.Padding);
+    this.CanvasContext.lineTo(this.Padding, this.Height - this.Padding);
+    this.CanvasContext.stroke();
+    // 5 evaluation lines on graph
+    this.CanvasContext.setLineDash([5, 15]);
+    for (i = 0; i < 5; i++) {
+      this.CanvasContext.beginPath();
+      this.CanvasContext.strokeStyle = grid_color;
+      this.CanvasContext.lineWidth = this.PointSize / 4;
+      this.CanvasContext.moveTo(this.Padding, this.Padding + i * grid_pitch);
+      this.CanvasContext.lineTo(this.Width, this.Padding + i * grid_pitch);
+      this.CanvasContext.stroke();
+    }
+
+    // Calculate point positions on canvas
     for (i = 0; i < this.EvaluationScores.length; i++) {
       score = this.EvaluationScores[i];
       if (score == EVAL_UNKNOWN) {
         point_positions.push({ x: offset_x, y: zero_y });
         point_types.push(POINT_TYPE_UNKNOWN);
-      } else if (score == EVAL_BAD) {
+      } else if (isNaN(score)) {
         point_positions.push({ x: offset_x, y: zero_y });
         point_types.push(POINT_TYPE_INVALID);
       } else if (score == EVAL_END) {
@@ -180,15 +214,20 @@ export class EvaluationHistoryGraph {
       }
       offset_x += point_pitch;
     }
+
+    // Create more click event handler if not enough
     while (this.PointElements.length < point_positions.length) {
       elem = document.createElement("div");
       elem.classList.add("eval-history-point");
-      elem.style.width = elem.style.height = `${this.PointSize * 2}px`;
-      elem.style.borderRadius = `${this.PointSize}px`;
+      elem.style.width = elem.style.height = `${this.PointSize * 4}px`;
+      elem.style.borderRadius = `${this.PointSize * 2}px`;
       elem.hidden = false;
       this.PointElements.push(elem);
       this.PointsContainer.appendChild(elem);
     }
+
+    // Draw the line graph
+    this.CanvasContext.setLineDash([]);
     for (i = 0; i < point_positions.length; i++) {
       point_type = point_types[i];
       this.CanvasContext.beginPath();
@@ -233,12 +272,12 @@ export class EvaluationHistoryGraph {
         const Y = point_positions[i].y;
         const move = this.SANMoves[i];
         const eval_description = eval_str;
-        elem.style.left = `${X - this.PointSize}px`;
-        elem.style.top = `${Y - this.PointSize}px`;
+        elem.style.left = `${X - this.PointSize * 2}px`;
+        elem.style.top = `${Y - this.PointSize * 2}px`;
         elem.hidden = false;
-        elem.onclick = (e) => {
-          e.stopPropagation();
-          e.preventDefault();
+        elem.onclick = (event) => {
+          event.stopPropagation();
+          event.preventDefault();
           this.ShowDescription(
             `${move || "Initial position"}\nEvaluation: ${eval_description}`,
             X,
@@ -255,6 +294,8 @@ export class EvaluationHistoryGraph {
         this.CanvasContext.stroke();
       }
     }
+
+    // Hide unused elements
     for (i = point_positions.length; i < this.PointElements.length; i++) {
       this.PointElements[i].hidden = true;
     }

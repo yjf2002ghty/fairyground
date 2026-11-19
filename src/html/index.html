@@ -7129,6 +7129,28 @@
                     [icon("stop")],
                   ),
                   m(
+                    "button#analyze-nextmove.sm.iconbtn",
+                    {
+                      type: "button",
+                      disabled: !is_ready || analysisBlocked(),
+                      hidden: !analysis_mode,
+                      title:
+                        "Click to go to next played move and continue analysis.",
+                    },
+                    [icon("next")],
+                  ),
+                  m(
+                    "button#analyze-recommended.sm.iconbtn",
+                    {
+                      type: "button",
+                      disabled: !is_ready || analysisBlocked(),
+                      hidden: !analysis_mode,
+                      title:
+                        "Click to make engine's recommended move and continue analysis.",
+                    },
+                    [icon("star")],
+                  ),
+                  m(
                     "button#seteval.sm",
                     {
                       type: "button",

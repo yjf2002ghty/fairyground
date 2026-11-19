@@ -1934,7 +1934,8 @@ button.inioption {
     0 0 1px rgba(0, 0, 0, 0.8);
 }
 
-#evalcomment, #evalinfo {
+#evalcomment,
+#evalinfo {
   white-space: normal;
   font-size: 12px;
   color: var(--muted);
@@ -1995,13 +1996,15 @@ spangameresultmini {
 
 /* engine tab */
 
-.sliders, .integer-inputs {
+.sliders,
+.integer-inputs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px 18px;
 }
 
-.sliderrow, .integerrow {
+.sliderrow,
+.integerrow {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2117,7 +2120,8 @@ spangameresultmini {
   gap: 10px;
 }
 
-#boardpiecechange, #boardeditorbuttons {
+#boardpiecechange,
+#boardeditorbuttons {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -2909,7 +2913,7 @@ div.popup textarea {
 
 .eval-history-description {
   position: absolute;
-  background: var(--surface2);
+  background: var(--surface);
   color: var(--text);
   padding: 3px;
   border: 1px solid var(--border2);
@@ -2917,7 +2921,8 @@ div.popup textarea {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
-.eval-history-point-container, .eval-history-canvas {
+.eval-history-point-container,
+.eval-history-canvas {
   position: absolute;
   top: 0;
   bottom: 0;

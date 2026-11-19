@@ -229,6 +229,10 @@ const pBoardOrientation = document.getElementById("boardorientation");
 const buttonSetEvaluation = document.getElementById("seteval");
 const evalHistoryContainer = document.getElementById("evalhistorycontainer");
 const checkboxShowEvalHistoryGraph = document.getElementById("showevalgraph");
+const buttonAnalyzeNextMove = document.getElementById("analyze-nextmove");
+const buttonAnalyzeRecommendedMove = document.getElementById(
+  "analyze-recommended",
+);
 
 // Compact number formatting for the engine statistics (1.2M, 850k).
 function formatCount(value) {
@@ -488,7 +492,7 @@ var promotionChoice = null;
 var timerElapsePreviousPlayer = false;
 // Spacebar best-move globals
 var lastPVPosSig = "";
-var lastPVBestMove = "";
+var lastPVBestMove = ""; // Also used by buttonAnalyzeRecommendedMove
 var lastPVTime = 0;
 var spacebarDebounce = false;
 
@@ -4527,6 +4531,28 @@ new Module().then((loadedModule) => {
       textMoves.value = gametree.GetMoveListOfMove(pointer);
       buttonSetFen.click();
     }
+  };
+
+  buttonAnalyzeNextMove.onclick = function () {
+    if (gametree.CurrentMove.NextNodes[0]) {
+      textMoves.value = gametree.GetMoveListOfMove(
+        gametree.CurrentMove.NextNodes[0],
+      );
+      pSetFen.click();
+    }
+  };
+
+  buttonAnalyzeRecommendedMove.onclick = function () {
+    const currentSig = `${textFen.value.trim()}|${textMoves.value.trim()}|${getColor(board)}`;
+    if (!lastPVBestMove || lastPVPosSig != currentSig) {
+      window.alert("Engine analysis is not started on displayed position.");
+      return;
+    } else if (lastPVBestMove == "0000") {
+      window.alert("No recommended move on displayed position.");
+      return;
+    }
+    textMoves.value = (textMoves.value + " " + lastPVBestMove).trim();
+    pSetFen.click();
   };
 
   gameStatus.onclick = function () {

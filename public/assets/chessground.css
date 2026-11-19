@@ -5,9 +5,9 @@
  * board and pieces displayed!
  */
 
- .cg-custom-below {
+.cg-custom-below {
   display: none !important;
- }
+}
 
 .cg-wrap {
   width: 640px;
@@ -18,8 +18,8 @@
 
 cg-helper {
   position: absolute;
-  width: calc(100% / var(--files,8));
-  padding-bottom: calc(100% / var(--files,8));
+  width: calc(100% / var(--files, 8));
+  padding-bottom: calc(100% / var(--files, 8));
   display: table; /* hack: round to full pixel size in chrome */
   bottom: 0;
 }
@@ -66,22 +66,40 @@ cg-board square {
   position: absolute;
   top: 0;
   left: 0;
-  width: calc(100% / var(--files,8));
-  height: calc(100% / var(--ranks,8));
+  width: calc(100% / var(--files, 8));
+  height: calc(100% / var(--ranks, 8));
   pointer-events: none;
 }
 cg-board square.move-dest {
-  background: radial-gradient(rgba(20, 85, 30, 0.5) 22%, #208530 0, rgba(0, 0, 0, 0.3) 0, rgba(0, 0, 0, 0) 0);
+  background: radial-gradient(
+    rgba(20, 85, 30, 0.5) 22%,
+    #208530 0,
+    rgba(0, 0, 0, 0.3) 0,
+    rgba(0, 0, 0, 0) 0
+  );
   pointer-events: auto;
 }
 cg-board square.premove-dest {
-  background: radial-gradient(rgba(20, 30, 85, 0.5) 22%, #203085 0, rgba(0, 0, 0, 0.3) 0, rgba(0, 0, 0, 0) 0);
+  background: radial-gradient(
+    rgba(20, 30, 85, 0.5) 22%,
+    #203085 0,
+    rgba(0, 0, 0, 0.3) 0,
+    rgba(0, 0, 0, 0) 0
+  );
 }
 cg-board square.oc.move-dest {
-  background: radial-gradient(transparent 0%, transparent 80%, rgba(20, 85, 0, 0.3) 80%);
+  background: radial-gradient(
+    transparent 0%,
+    transparent 80%,
+    rgba(20, 85, 0, 0.3) 80%
+  );
 }
 cg-board square.oc.premove-dest {
-  background: radial-gradient(transparent 0%, transparent 80%, rgba(20, 30, 85, 0.2) 80%);
+  background: radial-gradient(
+    transparent 0%,
+    transparent 80%,
+    rgba(20, 30, 85, 0.2) 80%
+  );
 }
 cg-board square.move-dest:hover {
   background: rgba(20, 85, 30, 0.3);
@@ -97,7 +115,13 @@ cg-board square.selected {
   background-color: rgba(20, 85, 30, 0.5);
 }
 cg-board square.check {
-  background: radial-gradient(ellipse at center, rgba(255, 0, 0, 1) 0%, rgba(231, 0, 0, 1) 25%, rgba(169, 0, 0, 0) 89%, rgba(158, 0, 0, 0) 100%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 0, 0, 1) 0%,
+    rgba(231, 0, 0, 1) 25%,
+    rgba(169, 0, 0, 0) 89%,
+    rgba(158, 0, 0, 0) 100%
+  );
 }
 cg-board square.current-premove {
   background-color: rgba(20, 30, 85, 0.5);
@@ -106,8 +130,8 @@ cg-board square.current-premove {
   position: absolute;
   top: 0;
   left: 0;
-  width: calc(100% / var(--files,8));
-  height: calc(100% / var(--ranks,8));
+  width: calc(100% / var(--files, 8));
+  height: calc(100% / var(--ranks, 8));
   background-size: cover;
   z-index: 2;
   will-change: transform;
@@ -130,7 +154,8 @@ cg-board piece.fading {
 .cg-wrap piece.ghost {
   opacity: 0.3;
 }
-.cg-wrap .cg-shapes, .cg-wrap .cg-custom-svgs {
+.cg-wrap .cg-shapes,
+.cg-wrap .cg-custom-svgs {
   overflow: hidden;
   position: absolute;
   top: 0px;
@@ -287,10 +312,10 @@ cg-board piece.fading {
 }
 
 .inner .cg-wrap coords coord.dark {
-  color: var(--dark-square-color,#000);
+  color: var(--dark-square-color, #000);
 }
 .inner .cg-wrap coords coord.light {
-  color: var(--light-square-color,#000);
+  color: var(--light-square-color, #000);
 }
 
 /* Drop variants */
@@ -304,7 +329,7 @@ cg-board piece.fading {
   width: calc(var(--pocketLength) * (var(--cg-width) / var(--files)));
   height: calc(var(--cg-height) / var(--ranks));
   border-radius: 3px;
-  box-shadow: 0 2px 3px rgba(0,0,0,0.3) inset;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.3) inset;
   background: #888;
   white-space: nowrap;
   display: flex;
@@ -318,7 +343,8 @@ cg-board piece.fading {
 .pocket.bottom {
   margin-top: var(--pocketMargin);
 }
-.pocket square, .pocket nosquare {
+.pocket square,
+.pocket nosquare {
   flex: 0 0 calc(100% / var(--pocketLength));
   position: relative !important;
   pointer-events: none;
@@ -329,7 +355,7 @@ cg-board piece.fading {
   background-position: center;
   pointer-events: auto;
 }
-.pocket square.selected-square{
+.pocket square.selected-square {
   background-color: #14551e80 !important;
 }
 .pocket.usable square:first-child:hover {
@@ -352,11 +378,11 @@ cg-board piece.fading {
   will-change: transform;
   background-color: rgba(155, 199, 0, 0.41);
 }
-.pocket piece[data-nb='0'] {
+.pocket piece[data-nb="0"] {
   cursor: auto;
   opacity: 0.1;
 }
-.movemode .pocket piece[data-nb='0'] {
+.movemode .pocket piece[data-nb="0"] {
   cursor: inherit;
 }
 .pocket piece::after {

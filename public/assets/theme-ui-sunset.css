@@ -20,8 +20,12 @@
   --blend-color1: #f0cf91bc;
   --blend-color2: #f6bfa8bc;
   --blend-mask-color: #fff6;
-  --text-shadow-style-black: 2px 2px 2px #000, 2px 2px 2px #000, -2px -2px 2px #000, -2px -2px 2px #000, 2px -2px 2px #000, 2px -2px 2px #000, -2px 2px 2px #000, -2px 2px 2px #000;
-  --text-shadow-style-white: 2px 2px 2px #fff, 2px 2px 2px #fff, -2px -2px 2px #fff, -2px -2px 2px #fff, 2px -2px 2px #fff, 2px -2px 2px #fff, -2px 2px 2px #fff, -2px 2px 2px #fff;
+  --text-shadow-style-black:
+    2px 2px 2px #000, 2px 2px 2px #000, -2px -2px 2px #000, -2px -2px 2px #000,
+    2px -2px 2px #000, 2px -2px 2px #000, -2px 2px 2px #000, -2px 2px 2px #000;
+  --text-shadow-style-white:
+    2px 2px 2px #fff, 2px 2px 2px #fff, -2px -2px 2px #fff, -2px -2px 2px #fff,
+    2px -2px 2px #fff, 2px -2px 2px #fff, -2px 2px 2px #fff, -2px 2px 2px #fff;
 }
 
 #pagebackground {
@@ -41,7 +45,9 @@ html {
 .drawer,
 .dialog,
 #moveselectiondialog {
-  background: linear-gradient(to right, var(--blend-color1), var(--blend-color2)), var(--blend-mask-color);
+  background:
+    linear-gradient(to right, var(--blend-color1), var(--blend-color2)),
+    var(--blend-mask-color);
   background-blend-mode: overlay;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -49,7 +55,9 @@ html {
 
 div.popup {
   background-color: transparent;
-  background: linear-gradient(to right, var(--blend-color1), var(--blend-color2)), var(--blend-mask-color);
+  background:
+    linear-gradient(to right, var(--blend-color1), var(--blend-color2)),
+    var(--blend-mask-color);
   background-blend-mode: overlay;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -70,7 +78,9 @@ div.popup {
 #enginesettingspopup,
 #loadsavedgamespopup {
   background-color: transparent;
-  background: linear-gradient(to right, var(--blend-color1), var(--blend-color2)), var(--blend-mask-color);
+  background:
+    linear-gradient(to right, var(--blend-color1), var(--blend-color2)),
+    var(--blend-mask-color);
 }
 
 button.danger {
@@ -106,7 +116,7 @@ coord {
   text-shadow: var(--text-shadow-style-white);
 }
 
-coord.light, coord.dark {
+coord.light,
+coord.dark {
   text-shadow: none;
 }
-
