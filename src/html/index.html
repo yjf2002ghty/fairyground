@@ -1992,8 +1992,7 @@
           ) {
             return;
           }
-          moveinput.value = element.moves;
-          setposition.click();
+          element.click();
           const miniboard = document.getElementById("chessground-mini");
           if (miniboard && !miniboard.locked) {
             miniboard.style.display = "none";
@@ -2012,35 +2011,35 @@
           moveMenu.style.top = `${top}px`;
         };
         let longPressTimer = null;
-        const movelist = document.getElementById("label-pgn");
+        const movelist = document.getElementById("pgn-container");
         if (movelist) {
-          movelist.addEventListener("click", (event) => {
-            const element = event.target.closest(".position-display-label");
-            const isgamestarted = document.getElementById("isgamestarted");
-            if (
-              !element ||
-              element.moves === undefined ||
-              (isgamestarted && isgamestarted.checked)
-            ) {
-              return;
-            }
-            const moveinput = document.getElementById("move");
-            const setposition = document.getElementById("setpos");
-            if (!moveinput || !setposition || setposition.disabled) {
-              return;
-            }
-            moveinput.value = element.moves;
-            setposition.click();
-            // The move list click also opens the preview mini board; the
-            // main board now shows the position, so close the preview.
-            // const miniboard = document.getElementById("chessground-mini");
-            // if (miniboard && !miniboard.locked) {
-            //   miniboard.style.display = "none";
-            // }
-          });
+          // movelist.addEventListener("click", (event) => {
+          //   const element = event.target.closest(".position-display-label");
+          //   const isgamestarted = document.getElementById("isgamestarted");
+          //   if (
+          //     !element ||
+          //     element.moves === undefined ||
+          //     (isgamestarted && isgamestarted.checked)
+          //   ) {
+          //     return;
+          //   }
+          //   const moveinput = document.getElementById("move");
+          //   const setposition = document.getElementById("setpos");
+          //   if (!moveinput || !setposition || setposition.disabled) {
+          //     return;
+          //   }
+          //   moveinput.value = element.moves;
+          //   setposition.click();
+          //   // The move list click also opens the preview mini board; the
+          //   // main board now shows the position, so close the preview.
+          //   // const miniboard = document.getElementById("chessground-mini");
+          //   // if (miniboard && !miniboard.locked) {
+          //   //   miniboard.style.display = "none";
+          //   // }
+          // });
           movelist.addEventListener("contextmenu", (event) => {
             const element = event.target.closest(".position-display-label");
-            if (!element || element.moves === undefined) {
+            if (!element) {
               return;
             }
             event.preventDefault();
@@ -2054,11 +2053,7 @@
             "touchstart",
             (event) => {
               const element = event.target.closest(".position-display-label");
-              if (
-                !element ||
-                element.moves === undefined ||
-                event.touches.length != 1
-              ) {
+              if (!element || event.touches.length != 1) {
                 return;
               }
               const touch = event.touches[0];
@@ -6698,11 +6693,33 @@
                 ]),
               ],
             ),
-            m("div#chessground-container-div.defaultboard.default.board8x8", [
-              m("div.cg-wrap.pocket-top", [m("div#pocket-top")]),
-              m("div#chessground-board"),
-              m("div.cg-wrap.pocket-bottom", [m("div#pocket-bottom")]),
-            ]),
+            m(
+              "div#chessground-container-div.defaultboard.default.board8x8",
+              {
+                onwheel: (event) => {
+                  if (event instanceof WheelEvent) {
+                    if (event.shiftKey) {
+                      event.stopPropagation();
+                      event.preventDefault();
+                      if (!game_started) {
+                        requestAnimationFrame(() => {
+                          if (event.deltaY < 0) {
+                            document.getElementById("previousposition").click();
+                          } else {
+                            document.getElementById("nextposition").click();
+                          }
+                        });
+                      }
+                    }
+                  }
+                },
+              },
+              [
+                m("div.cg-wrap.pocket-top", [m("div#pocket-top")]),
+                m("div#chessground-board"),
+                m("div.cg-wrap.pocket-bottom", [m("div#pocket-bottom")]),
+              ],
+            ),
             m("div.playerbar.bottom", [
               m(
                 "div.avatar",
@@ -7210,11 +7227,13 @@
               ]),
               m("p#positioninfo", ""),
               m("p#checkcounts"),
-              m("p#label-pgn", {
-                oncontextmenu: (e) => {
-                  e.preventDefault();
-                },
-              }),
+              m("div#pgn-container", [
+                m("p#label-pgn", {
+                  oncontextmenu: (e) => {
+                    e.preventDefault();
+                  },
+                }),
+              ]),
               m("div#evalhistorycontainer", {
                 hidden: !show_evaluation_history_graph,
               }),

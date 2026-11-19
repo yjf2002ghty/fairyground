@@ -219,8 +219,8 @@ export class EvaluationHistoryGraph {
     while (this.PointElements.length < point_positions.length) {
       elem = document.createElement("div");
       elem.classList.add("eval-history-point");
-      elem.style.width = elem.style.height = `${this.PointSize * 4}px`;
-      elem.style.borderRadius = `${this.PointSize * 2}px`;
+      elem.style.width = elem.style.height = `${this.PointSize * 2}px`;
+      elem.style.borderRadius = `${this.PointSize}px`;
       elem.hidden = false;
       this.PointElements.push(elem);
       this.PointsContainer.appendChild(elem);
@@ -272,8 +272,8 @@ export class EvaluationHistoryGraph {
         const Y = point_positions[i].y;
         const move = this.SANMoves[i];
         const eval_description = eval_str;
-        elem.style.left = `${X - this.PointSize * 2}px`;
-        elem.style.top = `${Y - this.PointSize * 2}px`;
+        elem.style.left = `${X - this.PointSize}px`;
+        elem.style.top = `${Y - this.PointSize}px`;
         elem.hidden = false;
         elem.onclick = (event) => {
           event.stopPropagation();
