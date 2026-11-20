@@ -1623,6 +1623,45 @@ button.inioption {
   align-items: center;
 }
 
+#pgndiv div.branch {
+  display: flex;
+  flex-direction: row;
+  gap: 6px 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  width: calc(100% - 5px);
+  margin-left: 5px;
+  border-left: 2px solid var(--border);
+  border-radius: 0px;
+  padding-left: 5px;
+}
+
+#pgndiv .move-grid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  width: 100%;
+}
+
+#pgndiv .move-grid > .move-number {
+  width: 10%;
+}
+
+#pgndiv .move-grid > .first-move-column,
+#pgndiv .move-grid > .second-move-column {
+  display: flex;
+  flex-direction: row;
+  gap: 6px 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  width: 45%;
+}
+
+#pgndiv .grid-block {
+  width: 100%;
+}
+
 #pgndiv .full-line {
   width: 100%;
 }
@@ -1696,10 +1735,6 @@ button.inioption {
   font-family: var(--font-mono);
   color: var(--accent);
   cursor: help;
-}
-
-.splitter.mainline {
-  width: 100%;
 }
 
 .fenrow {

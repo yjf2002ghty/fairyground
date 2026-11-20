@@ -535,6 +535,11 @@
           document
             .getElementById("boardcoordinate")
             .dispatchEvent(new Event("change"));
+          document.getElementById("pgnstyle").selectedIndex =
+            parseInt(localStorage.getItem("PGNStyle")) || 0;
+          document
+            .getElementById("pgnstyle")
+            .dispatchEvent(new Event("change"));
           if (localStorage.getItem("InnerCoordinate") == "true") {
             document.getElementById("check-innercoordinate").click();
           }
@@ -10907,6 +10912,59 @@
                         }),
                       ],
                     ),
+                    m("div.setting", { hidden: !advanced_pgn_mode }, [
+                      m("span", "PGN Display style"),
+                      m(
+                        "select#pgnstyle.sm",
+                        {
+                          title: "Choose the display style of move list panel.",
+                          onchange: () => {
+                            localStorage.setItem(
+                              "PGNStyle",
+                              document.getElementById("pgnstyle").selectedIndex,
+                            );
+                          },
+                        },
+                        [
+                          m(
+                            "option",
+                            {
+                              value: "flat",
+                              title:
+                                "The layout is the same as plain text: From left to right, change line if no space left.",
+                            },
+                            "Flat",
+                          ),
+                          m(
+                            "option",
+                            {
+                              value: "grid",
+                              title:
+                                "Main line moves are put into grid layout, while variations moves are still flat. Lichess.org style.",
+                            },
+                            "Grid",
+                          ),
+                          m(
+                            "option",
+                            {
+                              value: "tree-flat",
+                              title:
+                                "Variation moves are put into identation blocks, and brackets are removed. ChessBase.com style.",
+                            },
+                            "Flat (Tree)",
+                          ),
+                          m(
+                            "option",
+                            {
+                              value: "tree-grid",
+                              title:
+                                "Variation moves are also in grid layouts, and are put into identation blocks. Brackets are removed.",
+                            },
+                            "Grid (Tree)",
+                          ),
+                        ],
+                      ),
+                    ]),
                     m(
                       "div.setting",
                       {
@@ -11778,6 +11836,11 @@
                     { value: "normal", hidden: true },
                     "Ended by game rule",
                   ),
+                  m(
+                    "option",
+                    { value: "unknown", hidden: true },
+                    "Not Specified",
+                  ),
                 ]),
               ]),
               m("button#terminationset.sm.primary", { type: "button" }, "Set"),
@@ -11892,7 +11955,7 @@
               m("p#pgntexttitle.title", "Text"),
               m(
                 "p.hint",
-                'Note: Contents enclosed by square brackets, like "[%csl Ye4]", are special values used to represent additional information on this position, such as board markers, termination and evaluations. Deleting these will remove such information.',
+                'Note: Contents enclosed by square brackets, like "[%csl Ye4]", are special values used to represent additional information on this position, such as board markers, termination and evaluations. Deleting these will remove such information. Meanwhile, curly brackets ("{", "}") are not allowed in comments.',
               ),
               m("textarea#pgntextinput"),
               m("div#pgntextcontrol", [

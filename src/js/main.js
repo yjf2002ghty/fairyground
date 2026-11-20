@@ -235,6 +235,7 @@ const buttonAnalyzeRecommendedMove = document.getElementById(
   "analyze-recommended",
 );
 const divPgnContainer = document.getElementById("pgn-container");
+const dropdownPGNStyle = document.getElementById("pgnstyle");
 
 // Compact number formatting for the engine statistics (1.2M, 850k).
 function formatCount(value) {
@@ -430,6 +431,7 @@ const chessgroundnotations = [
 const MoveTextActionPartsMatcher = new RegExp("\\[.*?\\]", "g");
 const CompleteBlankStringMatcher = new RegExp("^\\s*$", "");
 const MoveNumberMatcher = new RegExp("\\d+\\.+", "g");
+const CurlyBracketsMatcher = new RegExp("\\{|\\}", "g");
 const SpaceSplitterMatcher = new RegExp("[ ]+", "");
 const SpaceReplacer = new RegExp("[ ]+", "g");
 const GameResults = ["1-0", "0-1", "1/2-1/2", "*"];
@@ -444,6 +446,7 @@ const GameTerminations = [
   "time forfeit",
   "unterminated",
   "normal",
+  "unknown",
 ];
 const FriendlyGameTerminationNames = [
   "(Not set)",
@@ -456,6 +459,7 @@ const FriendlyGameTerminationNames = [
   "Player run out of time",
   "Ongoing, not terminated",
   "Ended by game rule",
+  "Not Specified",
 ];
 let ffishnotationobjects = null;
 var PositionVariantsDirectory = new Map();
@@ -1112,7 +1116,10 @@ class GameTree {
       return;
     }
     this.UpdateHistory();
-    this.CurrentMove.Move.TextBefore = TextBefore;
+    this.CurrentMove.Move.TextBefore = TextBefore.replace(
+      CurlyBracketsMatcher,
+      "",
+    );
     this.AddHistory();
   }
 
@@ -1121,7 +1128,10 @@ class GameTree {
       throw TypeError();
     }
     this.UpdateHistory();
-    this.CurrentMove.Move.TextAfter = TextAfter;
+    this.CurrentMove.Move.TextAfter = TextAfter.replace(
+      CurlyBracketsMatcher,
+      "",
+    );
     this.AddHistory();
   }
 
@@ -1422,8 +1432,8 @@ class GameTree {
     return result.join(" ").replace(/\n/g, "\\n");
   }
 
-  ToPGNDiv(Notation) {
-    if (Notation == null) {
+  ToPGNDiv(Notation, Mode = "flat") {
+    if (Notation == null || typeof Mode != "string") {
       throw TypeError();
     }
     function new_info_struct() {
@@ -1466,6 +1476,15 @@ class GameTree {
     let terminationstr;
     let evalstr = "";
     let pgn_container_vnodes = [];
+    let vnode_types = [];
+
+    const VNODE_SPLITTER_START = 0;
+    const VNODE_SPLITTER_END = 1;
+    const VNODE_MOVE_NUMBER = 2;
+    const VNODE_FIRST_MOVE = 3;
+    const VNODE_SECOND_MOVE = 4;
+    const VNODE_INLINE_OBJECT = 5;
+    const VNODE_BLOCK_OBJECT = 6;
 
     for (i = 0; i < tokens.length; i++) {
       if (tokens[i].IsSplitter) {
@@ -1479,6 +1498,7 @@ class GameTree {
             pgn_container_vnodes.push(
               m(`p.splitter${stack.length == 1 ? ".mainline" : ""}`, "("),
             );
+            vnode_types.push(VNODE_SPLITTER_START);
           }
         } else if (tokens[i].Move.Move == ")") {
           movestack = stack[stack.length - 1].split(" ");
@@ -1492,6 +1512,7 @@ class GameTree {
             pgn_container_vnodes.push(
               m(`p.splitter${stack.length == 0 ? ".mainline" : ""}`, ")"),
             );
+            vnode_types.push(VNODE_SPLITTER_END);
           }
         }
       } else {
@@ -1515,6 +1536,7 @@ class GameTree {
                 displaytextbefore,
               ),
             );
+            vnode_types.push(VNODE_BLOCK_OBJECT);
           }
         } else {
           displaytextbefore = "";
@@ -1539,6 +1561,7 @@ class GameTree {
               ),
             );
           }
+          vnode_types.push(VNODE_MOVE_NUMBER);
         } else if (i > 0 && tokens[i].Move.MoverRound == 0) {
           pgn_container_vnodes.push(
             m(
@@ -1546,6 +1569,7 @@ class GameTree {
               `${Math.ceil(tokens[i].Move.HalfMoveNumber / 2)}.`,
             ),
           );
+          vnode_types.push(VNODE_MOVE_NUMBER);
         }
         if (i == 0) {
           gameresult = getBoardResult(tmpboard);
@@ -1607,6 +1631,9 @@ class GameTree {
               info_struct.text_content,
             ),
           );
+          vnode_types.push(
+            tmpboard.turn() ? VNODE_SECOND_MOVE : VNODE_FIRST_MOVE,
+          );
         }
         if (tokens[i].Move.TextAfter) {
           parsedtext = moveutil.ParseTextActions(tokens[i].Move.TextAfter);
@@ -1639,6 +1666,7 @@ class GameTree {
                 ),
               );
             }
+            vnode_types.push(VNODE_INLINE_OBJECT);
           }
           if (boardmarkers.length > 1) {
             if (i > 0) {
@@ -1653,6 +1681,7 @@ class GameTree {
                   "This position has additional markers on the board. Click this move to view it on the mini board.",
               }),
             );
+            vnode_types.push(VNODE_INLINE_OBJECT);
           }
           if (gameresult != "*") {
             if (terminationstr.length == 2) {
@@ -1666,6 +1695,7 @@ class GameTree {
                     ],
                 ),
               );
+              vnode_types.push(VNODE_BLOCK_OBJECT);
             }
           } else if (terminationstr.length == 2) {
             if (
@@ -1688,6 +1718,7 @@ class GameTree {
                     ],
                 ),
               );
+              vnode_types.push(VNODE_BLOCK_OBJECT);
             }
           }
           if (tokens[i].Move.TextAfter.includes("[#]")) {
@@ -1706,6 +1737,7 @@ class GameTree {
                 displaytextafter,
               ),
             );
+            vnode_types.push(VNODE_BLOCK_OBJECT);
           }
         } else {
           displaytextafter = "";
@@ -1727,6 +1759,7 @@ class GameTree {
               "...",
             ),
           );
+          vnode_types.push(VNODE_INLINE_OBJECT);
         }
       }
     }
@@ -1755,10 +1788,134 @@ class GameTree {
     }
     if (tmpboardresult != "*") {
       pgn_container_vnodes.push(m("p.result", tmpboardresult));
+      vnode_types.push(VNODE_BLOCK_OBJECT);
     }
     tmpboard.delete();
 
-    return m("div#pgndiv.board-display-san", pgn_container_vnodes);
+    if (Mode == "flat") {
+      return m("div#pgndiv.board-display-san", pgn_container_vnodes);
+    } else if (Mode == "tree-flat") {
+      let stack = [];
+      let level = 0;
+      let current_list = [];
+      let previous_list;
+      let element;
+      for (i = 0; i < pgn_container_vnodes.length; i++) {
+        if (vnode_types[i] == VNODE_SPLITTER_START) {
+          stack.push(current_list);
+          current_list = [];
+          level++;
+        } else if (vnode_types[i] == VNODE_SPLITTER_END) {
+          previous_list = current_list;
+          element = stack.pop();
+          current_list = element;
+          current_list.push(m("div.branch", previous_list));
+          level--;
+        } else {
+          current_list.push(pgn_container_vnodes[i]);
+        }
+      }
+      return m("div#pgndiv.board-display-san", current_list);
+    } else if (Mode == "tree-grid" || Mode == "grid") {
+      const RECURSE = Mode == "tree-grid";
+      function generate_move_element(move_element, is_final_move = false) {
+        if (move_element.first_move_elements.length == 0) {
+          move_element.first_move_elements = "...";
+        }
+        if (move_element.second_move_elements.length == 0) {
+          move_element.second_move_elements = is_final_move ? null : "...";
+        }
+        return m("div.move-grid", [
+          move_element.move_number,
+          m("div.first-move-column", move_element.first_move_elements),
+          m("div.second-move-column", move_element.second_move_elements),
+        ]);
+      }
+      function new_move_grid() {
+        return {
+          move_number: null,
+          first_move_elements: [],
+          second_move_elements: [],
+        };
+      }
+      let stack = [];
+      let level = 0;
+      let current_list = [];
+      let current_move_element = new_move_grid();
+      let current_move_inline_elements = [];
+      let previous_list;
+      let element;
+      for (i = 0; i < pgn_container_vnodes.length; i++) {
+        if (vnode_types[i] == VNODE_SPLITTER_START) {
+          if (RECURSE || level == 0) {
+            if (current_move_element.move_number) {
+              current_list.push(generate_move_element(current_move_element));
+              current_move_element = new_move_grid();
+            }
+            stack.push(current_list);
+            current_list = [];
+          } else {
+            current_list.push(pgn_container_vnodes[i]);
+          }
+          level++;
+        } else if (vnode_types[i] == VNODE_SPLITTER_END) {
+          if (RECURSE || level == 1) {
+            if (RECURSE && current_move_element.move_number) {
+              current_list.push(
+                generate_move_element(current_move_element, true),
+              );
+              current_move_element = new_move_grid();
+            }
+            previous_list = current_list;
+            element = stack.pop();
+            current_list = element;
+            current_list.push(m("div.branch", previous_list));
+          } else {
+            current_list.push(pgn_container_vnodes[i]);
+          }
+          level--;
+        } else {
+          if (RECURSE || level == 0) {
+            if (vnode_types[i] == VNODE_MOVE_NUMBER) {
+              if (current_move_element.move_number) {
+                current_list.push(generate_move_element(current_move_element));
+                current_move_element = new_move_grid();
+              }
+              current_move_element.move_number = pgn_container_vnodes[i];
+            } else if (vnode_types[i] == VNODE_FIRST_MOVE) {
+              current_move_inline_elements =
+                current_move_element.first_move_elements;
+              current_move_element.first_move_elements.push(
+                pgn_container_vnodes[i],
+              );
+            } else if (vnode_types[i] == VNODE_SECOND_MOVE) {
+              current_move_inline_elements =
+                current_move_element.second_move_elements;
+              current_move_element.second_move_elements.push(
+                pgn_container_vnodes[i],
+              );
+            } else if (vnode_types[i] == VNODE_INLINE_OBJECT) {
+              current_move_inline_elements.push(pgn_container_vnodes[i]);
+            } else if (vnode_types[i] == VNODE_BLOCK_OBJECT) {
+              if (current_move_element.move_number) {
+                current_list.push(generate_move_element(current_move_element));
+                current_move_element = new_move_grid();
+              }
+              current_list.push(m("div.grid-block"), [pgn_container_vnodes[i]]);
+            }
+          } else {
+            current_list.push(pgn_container_vnodes[i]);
+          }
+        }
+      }
+      if (current_move_element.move_number) {
+        current_list.push(generate_move_element(current_move_element, true));
+        current_move_element = new_move_grid();
+      }
+      return m("div#pgndiv.board-display-san", current_list);
+    } else {
+      return m("div#pgndiv.board-display-san", pgn_container_vnodes);
+    }
   }
 }
 
@@ -5684,6 +5841,10 @@ new Module().then((loadedModule) => {
     updatePGNDivision(false);
   };
 
+  dropdownPGNStyle.addEventListener("change", () => {
+    updatePGNDivision(false);
+  });
+
   updateInnerCoordinateColor(chessground);
 
   updateChessground(true);
@@ -6777,7 +6938,10 @@ function getPgnDiv(board) {
       buttonMoveTreeTextAfter.disabled =
       buttonMoveTreeTermination.disabled =
         false;
-    return gametree.ToPGNDiv(ffishnotationobjects[notationindex]);
+    return gametree.ToPGNDiv(
+      ffishnotationobjects[notationindex],
+      dropdownPGNStyle[dropdownPGNStyle.selectedIndex].value,
+    );
   }
 }
 
@@ -7357,6 +7521,9 @@ function updatePGNDivisionTimeoutCheck() {
 }
 
 function updatePGNDivision(force_update = false, auto_scroll = true) {
+  if (!ffish) {
+    return;
+  }
   if (
     force_update ||
     Date.now() - PgnDivThrottleStartTime > PgnDivThrottleDurationMs
