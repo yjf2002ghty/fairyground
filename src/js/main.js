@@ -1769,6 +1769,15 @@ let themedetector = new themeutil.ChessgroundThemeDetector(
 );
 let evalhistorygraph = new evalhistory.EvaluationHistoryGraph(
   evalHistoryContainer,
+  (index) => {
+    let moves = gametree
+      .GetCompleteMainLineMoveListOfMove(gametree.CurrentMove)
+      .split(" ");
+    if (index >= 0 && index < moves.length && !isGameStarted.checked) {
+      textMoves.value = moves.slice(0, index).join(" ");
+      buttonSetFen.click();
+    }
+  },
 );
 
 document.addEventListener("themechange", (event) => {
@@ -7347,32 +7356,32 @@ function updatePGNDivisionTimeoutCheck() {
   }
 }
 
-function updatePGNDivision(force_update = false, auto_scroll = false) {
+function updatePGNDivision(force_update = false, auto_scroll = true) {
   if (
     force_update ||
     Date.now() - PgnDivThrottleStartTime > PgnDivThrottleDurationMs
   ) {
-    // let deletelater = [];
-    // while (labelPgn.childNodes[0]) {
-    //   deletelater.push(labelPgn.removeChild(labelPgn.childNodes[0]));
-    // }
     if (isAdvPGNMode.checked) {
-      //labelPgn.appendChild(getPgnDiv(board));
       m.render(labelPgn, getPgnDiv(board));
     } else {
-      //labelPgn.innerText = getPgn(board);
       m.render(labelPgn, getPgn(board) ?? "");
     }
     if (checkboxShowEvalHistoryGraph.checked) {
       DrawEvaluationHistoryGraph();
     }
     if (auto_scroll) {
-      1;
+      let current_move_element =
+        labelPgn.getElementsByClassName("current-move")[0];
+      if (current_move_element) {
+        current_move_element.scrollIntoView({
+          container: "nearest",
+          block: "nearest",
+          inline: "nearest",
+        });
+      } else {
+        labelPgn.scrollTo(0, 0);
+      }
     }
-    // setTimeout(() => {
-    //   let tmp = deletelater;
-    //   deletelater = null;
-    // }, 500);
     PgnDivThrottleStartTime = Date.now();
     PgnDivCalledDuringThrottle = false;
     setTimeout(updatePGNDivisionTimeoutCheck, PgnDivThrottleDurationMs);

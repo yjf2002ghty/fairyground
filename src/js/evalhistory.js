@@ -6,9 +6,15 @@ const POINT_TYPE_UNKNOWN = 1;
 const POINT_TYPE_INVALID = 2;
 const POINT_TYPE_END = 3;
 
+const EPSILON = 1e-6;
+
 export class EvaluationHistoryGraph {
-  constructor(Container) {
-    if (!(Container instanceof HTMLElement)) {
+  constructor(Container, OnSelectMoveCallback) {
+    if (
+      !(Container instanceof HTMLElement) ||
+      (typeof OnSelectMoveCallback != "function" &&
+        typeof OnSelectMoveCallback != "undefined")
+    ) {
       throw TypeError();
     }
     const container_style = window.getComputedStyle(Container);
@@ -17,6 +23,7 @@ export class EvaluationHistoryGraph {
     this.Padding = 5;
     this.PointSize = 4;
     this.LineWidth = this.PointSize / 2;
+    this.MinHorizonalPointToPointDistance = 2.5 * this.PointSize;
     this.MinPointCount = 20;
     this.MaxEvaluationScore = 10;
     this.MinEvaluationScore = -10;
@@ -35,14 +42,44 @@ export class EvaluationHistoryGraph {
     this.PointsContainer.appendChild(this.DescriptionElement);
     this.PointElements = [];
     this.CurrentIndex = 0;
+    this.XOffset = 0;
     this.Canvas.width = this.Width = parseFloat(container_style.width);
     this.Canvas.height = this.Height = parseFloat(container_style.height);
     this.OnResizeCallback = this.OnResize.bind(this);
     this.HideDescriptionCallback = this.HideDescription.bind(this);
+    this.OnSelectMoveCallback = OnSelectMoveCallback;
+    this.PreviousClickPosX = 0;
+    this.PreviousXOffset = 0;
+    this.__Draw = this.Draw.bind(this);
+    this.DragHandler = (event) => {
+      this.XOffset =
+        this.PreviousXOffset + (this.PreviousClickPosX - event.clientX);
+      if (this.XOffset < 0) {
+        this.XOffset = 0;
+      }
+      requestAnimationFrame(this.__Draw);
+    };
     Container.appendChild(this.Canvas);
     Container.appendChild(this.PointsContainer);
     document.addEventListener("click", this.HideDescriptionCallback);
     window.addEventListener("resize", this.OnResizeCallback);
+    Container.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      this.XOffset = 0;
+      this.Draw();
+    });
+    Container.addEventListener("mousedown", (event) => {
+      if (event.target.closest(".eval-history-point")) {
+        return;
+      }
+      this.PreviousXOffset = this.XOffset;
+      this.PreviousClickPosX = event.clientX;
+      Container.addEventListener("mousemove", this.DragHandler);
+    });
+    Container.addEventListener("mouseup", () => {
+      Container.removeEventListener("mousemove", this.DragHandler);
+    });
+    Container.addEventListener("redraw", this.__Draw);
   }
 
   destructor() {
@@ -142,9 +179,11 @@ export class EvaluationHistoryGraph {
     const root_style = window.getComputedStyle(document.querySelector(":root"));
     const point_positions = [];
     const point_types = [];
-    const point_pitch =
+    const point_pitch = Math.max(
       (this.Width - 2 * this.Padding) /
-      (Math.max(this.MinPointCount, this.EvaluationScores.length) - 1);
+        (Math.max(this.MinPointCount, this.EvaluationScores.length) - 1),
+      this.MinHorizonalPointToPointDistance,
+    );
     const resize_factor =
       (this.Height - 2 * this.Padding) /
       (this.MaxEvaluationScore - this.MinEvaluationScore);
@@ -153,13 +192,16 @@ export class EvaluationHistoryGraph {
     const bad_color = root_style.getPropertyValue("--bad");
     const grid_color = root_style.getPropertyValue("--border2");
     const grid_pitch = (this.Height - 2 * this.Padding) / 4;
+    const min_x = this.Padding - EPSILON;
+    const max_x = this.Width - this.Padding + EPSILON;
     let i = 0;
-    let offset_x = this.Padding;
+    let offset_x = this.Padding - this.XOffset;
     let score = 0;
     let offset_y = 0;
     let eval_str = "";
     let point_type = 0;
     let elem;
+    let current_x = 0;
 
     // Draw the grid
     this.CanvasContext.setLineDash([]);
@@ -230,32 +272,40 @@ export class EvaluationHistoryGraph {
     this.CanvasContext.setLineDash([]);
     for (i = 0; i < point_positions.length; i++) {
       point_type = point_types[i];
-      this.CanvasContext.beginPath();
-      this.CanvasContext.arc(
-        point_positions[i].x,
-        point_positions[i].y,
-        this.PointSize,
-        0,
-        this.PI2,
-      );
-      this.CanvasContext.fillStyle =
-        point_type == POINT_TYPE_VALID ? color : bad_color;
-      this.CanvasContext.fill();
-      this.CanvasContext.closePath();
+      current_x = point_positions[i].x;
+      if (current_x > min_x && current_x < max_x) {
+        this.CanvasContext.beginPath();
+        this.CanvasContext.arc(
+          current_x,
+          point_positions[i].y,
+          this.PointSize,
+          0,
+          this.PI2,
+        );
+        this.CanvasContext.fillStyle =
+          point_type == POINT_TYPE_VALID ? color : bad_color;
+        this.CanvasContext.fill();
+        this.CanvasContext.closePath();
+      }
       if (
         i > 0 &&
         point_type == POINT_TYPE_VALID &&
         point_types[i - 1] == POINT_TYPE_VALID
       ) {
-        this.CanvasContext.beginPath();
-        this.CanvasContext.strokeStyle = color;
-        this.CanvasContext.lineWidth = this.LineWidth;
-        this.CanvasContext.moveTo(
-          point_positions[i - 1].x,
-          point_positions[i - 1].y,
-        );
-        this.CanvasContext.lineTo(point_positions[i].x, point_positions[i].y);
-        this.CanvasContext.stroke();
+        if (
+          (current_x > min_x && current_x < max_x) ||
+          (point_positions[i - 1].x > min_x && point_positions[i - 1].x < max_x)
+        ) {
+          this.CanvasContext.beginPath();
+          this.CanvasContext.strokeStyle = color;
+          this.CanvasContext.lineWidth = this.LineWidth;
+          this.CanvasContext.moveTo(
+            point_positions[i - 1].x,
+            point_positions[i - 1].y,
+          );
+          this.CanvasContext.lineTo(current_x, point_positions[i].y);
+          this.CanvasContext.stroke();
+        }
       }
       if (point_type == POINT_TYPE_VALID || point_type == POINT_TYPE_END) {
         eval_str = this.OriginalEvaluationStrings[i];
@@ -268,13 +318,14 @@ export class EvaluationHistoryGraph {
       }
       elem = this.PointElements[i];
       if (elem instanceof HTMLElement) {
-        const X = point_positions[i].x;
+        const X = current_x;
         const Y = point_positions[i].y;
         const move = this.SANMoves[i];
         const eval_description = eval_str;
+        let current_index = i;
         elem.style.left = `${X - this.PointSize}px`;
         elem.style.top = `${Y - this.PointSize}px`;
-        elem.hidden = false;
+        elem.hidden = current_x <= min_x || current_x >= max_x;
         elem.onclick = (event) => {
           event.stopPropagation();
           event.preventDefault();
@@ -284,13 +335,20 @@ export class EvaluationHistoryGraph {
             Y,
           );
         };
+        elem.oncontextmenu = (event) => {
+          event.stopPropagation();
+          event.preventDefault();
+          if (this.OnSelectMoveCallback) {
+            this.OnSelectMoveCallback(current_index);
+          }
+        };
       }
-      if (i == this.CurrentIndex) {
+      if (i == this.CurrentIndex && current_x > min_x && current_x < max_x) {
         this.CanvasContext.beginPath();
         this.CanvasContext.strokeStyle = `rgba(128,128,128,0.5)`;
         this.CanvasContext.lineWidth = this.PointSize * 2;
-        this.CanvasContext.moveTo(point_positions[i].x, 0);
-        this.CanvasContext.lineTo(point_positions[i].x, this.Height);
+        this.CanvasContext.moveTo(current_x, 0);
+        this.CanvasContext.lineTo(current_x, this.Height);
         this.CanvasContext.stroke();
       }
     }

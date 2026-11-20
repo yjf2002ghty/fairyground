@@ -4568,6 +4568,9 @@
             uithemes[1][index].StartCanvasAnimation();
           }
           updateUIThemeDropdown(ui_id);
+          document
+            .getElementById("evalhistorycontainer")
+            .dispatchEvent(new Event("redraw"));
           if (save_to_local_storage) {
             localStorage.setItem("UserSelectedUITheme", ui_id);
           }
@@ -6698,18 +6701,16 @@
               {
                 onwheel: (event) => {
                   if (event instanceof WheelEvent) {
-                    if (event.shiftKey) {
-                      event.stopPropagation();
-                      event.preventDefault();
-                      if (!game_started) {
-                        requestAnimationFrame(() => {
-                          if (event.deltaY < 0) {
-                            document.getElementById("previousposition").click();
-                          } else {
-                            document.getElementById("nextposition").click();
-                          }
-                        });
-                      }
+                    event.stopPropagation();
+                    event.preventDefault();
+                    if (!game_started) {
+                      requestAnimationFrame(() => {
+                        if (event.deltaY < 0) {
+                          document.getElementById("previousposition").click();
+                        } else {
+                          document.getElementById("nextposition").click();
+                        }
+                      });
                     }
                   }
                 },
@@ -7234,9 +7235,20 @@
                   },
                 }),
               ]),
-              m("div#evalhistorycontainer", {
-                hidden: !show_evaluation_history_graph,
-              }),
+              m("div#evalhistory", { hidden: !show_evaluation_history_graph }, [
+                m(
+                  "span.label",
+                  {
+                    onclick: () => {
+                      window.alert(
+                        "(Assuming you use left button as primary mouse button)\nUsage:\nDrag on the graph to pan.\nRight click on the graph to reset view.\nLeft click the points to show move information.\nRight click the points to display that position.",
+                      );
+                    },
+                  },
+                  "Evaluation History",
+                ),
+                m("div#evalhistorycontainer"),
+              ]),
               m(
                 "div#pgn-operation-container.pgntools",
                 { hidden: !advanced_pgn_mode || game_started },

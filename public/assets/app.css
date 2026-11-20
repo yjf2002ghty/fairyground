@@ -2912,9 +2912,15 @@ div.popup textarea {
 
 /* ---------- evaluation history graph ---------- */
 
+#evalhistory .label {
+  cursor: help;
+}
+
 #evalhistorycontainer {
   height: 100px;
   position: relative;
+  user-select: none;
+  cursor: move;
 }
 
 .eval-history-description {
@@ -2940,6 +2946,7 @@ div.popup textarea {
 .eval-history-point {
   position: absolute;
   background: transparent;
+  cursor: pointer;
 }
 
 /* ---------- legacy hooks kept for compatibility ---------- */
