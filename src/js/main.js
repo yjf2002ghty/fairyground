@@ -445,8 +445,8 @@ const GameTerminations = [
   "rules infraction",
   "time forfeit",
   "unterminated",
-  "normal",
   "unknown",
+  "normal",
 ];
 const FriendlyGameTerminationNames = [
   "(Not set)",
@@ -458,8 +458,8 @@ const FriendlyGameTerminationNames = [
   "Rules infraction",
   "Player run out of time",
   "Ongoing, not terminated",
-  "Ended by game rule",
   "Not Specified",
+  "Ended by game rule",
 ];
 let ffishnotationobjects = null;
 var PositionVariantsDirectory = new Map();
@@ -4801,6 +4801,8 @@ new Module().then((loadedModule) => {
         headers[7] != ""
       ) {
         gametree.CurrentMove.Move.TextAfter += `[%end ${headers[6]},${headers[7]}]`;
+      } else if (headers[6] != "" && headers[6] != "*" && headers[7] == "") {
+        gametree.CurrentMove.Move.TextAfter += `[%end ${headers[6]},unknown]`;
       }
       textFen.value = tokens[0];
       textMoves.value = tokens[1];

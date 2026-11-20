@@ -2952,7 +2952,7 @@ div.popup textarea {
 }
 
 #evalhistorycontainer {
-  height: 100px;
+  height: 200px;
   position: relative;
   user-select: none;
   cursor: move;
