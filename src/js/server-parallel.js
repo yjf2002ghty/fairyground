@@ -359,9 +359,9 @@ if (cluster.isMaster) {
     let levels = path.split(PathLevelSeperatorMatcher);
     levels = levels.slice(0, -1);
     if (os.type == "Windows_NT") {
-      return levels.join("\\");
+      return levels.join("\\") + "\\";
     } else {
-      return levels.join("/");
+      return levels.join("/") + "/";
     }
   }
 

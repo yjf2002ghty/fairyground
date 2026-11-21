@@ -314,7 +314,6 @@ class Engine {
     this.WorkingDirectory = WorkingDirectory;
     if (WorkingDirectory == "") {
       this.WorkingDirectory = GetWorkingDirectoryFromExcutablePath(Command);
-      console.log("[TEST] Using default directory:", this.WorkingDirectory);
     }
     this.Protocol = Protocol;
     this.Options = Options;
