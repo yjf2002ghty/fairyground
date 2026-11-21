@@ -1,11 +1,4 @@
-﻿if (window.fairyground) {
-} else {
-  throw TypeError(
-    'Namespace "fairyground" is not defined. Cannot transfer definitions to main page.',
-  );
-}
-
-window.fairyground.SavedGamesParsingFeature = { super: window.fairyground };
+﻿import * as fge from "./binaryEngine.js";
 
 const WhiteSpaceMatcher2 = new RegExp("[ ]+", "");
 const LineFeedCarriageReturnMatcher2 = new RegExp("(\r\n)|(\r)", "g");
@@ -16,7 +9,7 @@ const MoveEvaluationCommentMatcher = new RegExp("\\!|\\?", "g");
 const MoveNumberMatcher = new RegExp("^[0-9]+\\.+$", "");
 const MoveNumberHeaderMatcher = new RegExp("^[0-9]+\\.+", "");
 
-function RemovePGNNotes(PGNSANMove) {
+export function RemovePGNNotes(PGNSANMove) {
   if (typeof PGNSANMove != "string") {
     throw TypeError();
   }
@@ -38,9 +31,7 @@ function RemovePGNNotes(PGNSANMove) {
   return result;
 }
 
-window.fairyground.SavedGamesParsingFeature.RemovePGNNotes = RemovePGNNotes;
-
-function RemoveSANMoveNotes(MoveList) {
+export function RemoveSANMoveNotes(MoveList) {
   if (!Array.isArray(MoveList)) {
     throw TypeError();
   }
@@ -53,10 +44,7 @@ function RemoveSANMoveNotes(MoveList) {
   });
 }
 
-window.fairyground.SavedGamesParsingFeature.RemoveSANMoveNotes =
-  RemoveSANMoveNotes;
-
-function SetPosition(FEN, UCIMoves, Variant, Is960, PGNString, Headers) {
+export function SetPosition(FEN, UCIMoves, Variant, Is960, PGNString, Headers) {
   if (
     typeof FEN != "string" ||
     typeof UCIMoves != "string" ||
@@ -96,10 +84,7 @@ function SetPosition(FEN, UCIMoves, Variant, Is960, PGNString, Headers) {
   return true;
 }
 
-window.fairyground.SavedGamesParsingFeature.SetPosition = SetPosition;
-
-function GetCurrentGameInformation(FFishJSLibrary) {
-  const fge = window.fairyground.BinaryEngineFeature;
+export function GetCurrentGameInformation(FFishJSLibrary) {
   const Variant =
     document.getElementById("dropdown-variant").value == ""
       ? "chess"
@@ -185,10 +170,7 @@ function GetCurrentGameInformation(FFishJSLibrary) {
   }
 }
 
-window.fairyground.SavedGamesParsingFeature.GetCurrentGameInformation =
-  GetCurrentGameInformation;
-
-class Game {
+export class Game {
   constructor(
     Variant,
     FEN,
@@ -411,9 +393,7 @@ class Game {
   }
 }
 
-window.fairyground.SavedGamesParsingFeature.Game = Game;
-
-class PortableGameNotation {
+export class PortableGameNotation {
   constructor(FileRawText, FFishJSLibrary) {
     if (typeof FileRawText != "string" && FileRawText !== undefined) {
       throw TypeError();
@@ -880,10 +860,7 @@ class PortableGameNotation {
   }
 }
 
-window.fairyground.SavedGamesParsingFeature.PortableGameNotation =
-  PortableGameNotation;
-
-class ExtendedPositionDescription {
+export class ExtendedPositionDescription {
   constructor(FileRawText, FFishJSLibrary) {
     if (typeof FileRawText != "string" && FileRawText !== undefined) {
       throw TypeError();
@@ -1121,10 +1098,7 @@ class ExtendedPositionDescription {
   }
 }
 
-window.fairyground.SavedGamesParsingFeature.ExtendedPositionDescription =
-  ExtendedPositionDescription;
-
-class GameDisplayTable {
+export class GameDisplayTable {
   constructor(GlobalGameList) {
     if (!Array.isArray(GlobalGameList)) {
       throw TypeError();
@@ -1313,7 +1287,7 @@ class GameDisplayTable {
     let applypos = document.createElement("button");
     let applypostext = document.createTextNode("Set Position");
     applypos.appendChild(applypostext);
-    applypos.onclick = function () {
+    applypos.onclick = () => {
       if (
         SetPosition(
           GameObject.FEN,
@@ -1558,9 +1532,7 @@ class GameDisplayTable {
   }
 }
 
-window.fairyground.SavedGamesParsingFeature.GameDisplayTable = GameDisplayTable;
-
-function ShowPGNOrEPDFileUI(GameList, FFishJSLibrary) {
+export function ShowPGNOrEPDFileUI(GameList, FFishJSLibrary) {
   if (!Array.isArray(GameList) || FFishJSLibrary == null) {
     throw TypeError();
   }
@@ -1602,7 +1574,7 @@ function ShowPGNOrEPDFileUI(GameList, FFishJSLibrary) {
   operationdiv.appendChild(filetext);
   let openfile = document.createElement("input");
   openfile.type = "file";
-  openfile.onchange = function (event) {
+  openfile.onchange = (event) => {
     const selected = event.currentTarget.files[0];
     if (selected) {
       const name = selected.name;
@@ -1617,7 +1589,7 @@ function ShowPGNOrEPDFileUI(GameList, FFishJSLibrary) {
         }
       }
       let reader = new FileReader();
-      reader.onload = function () {
+      reader.onload = () => {
         console.log(reader.result);
         if (name.endsWith(".pgn")) {
           let PGNObj = new PortableGameNotation(reader.result, FFishJSLibrary);
@@ -1644,7 +1616,7 @@ function ShowPGNOrEPDFileUI(GameList, FFishJSLibrary) {
   cleargames.classList.add("ripple");
   let cleargamestext = document.createTextNode("Clear List");
   cleargames.appendChild(cleargamestext);
-  cleargames.onclick = function () {
+  cleargames.onclick = () => {
     while (GameList.length > 0) {
       GameList.pop();
     }
@@ -1654,7 +1626,7 @@ function ShowPGNOrEPDFileUI(GameList, FFishJSLibrary) {
   addtolist.classList.add("ripple");
   let addtolisttext = document.createTextNode("Add Current Game To List");
   addtolist.appendChild(addtolisttext);
-  addtolist.onclick = function () {
+  addtolist.onclick = () => {
     const info = GetCurrentGameInformation(FFishJSLibrary);
     if (info == null) {
       window.alert(
@@ -1689,7 +1661,7 @@ function ShowPGNOrEPDFileUI(GameList, FFishJSLibrary) {
   savetopgn.classList.add("ripple");
   let savetopgntext = document.createTextNode("Save PGN");
   savetopgn.appendChild(savetopgntext);
-  savetopgn.onclick = function () {
+  savetopgn.onclick = () => {
     let filecontent = "";
     table.GameList.forEach((val) => {
       filecontent += `${val.ToPortableGameNotation(FFishJSLibrary)}\n`;
@@ -1700,7 +1672,7 @@ function ShowPGNOrEPDFileUI(GameList, FFishJSLibrary) {
   savetoepd.classList.add("ripple");
   let savetoepdtext = document.createTextNode("Save EPD");
   savetoepd.appendChild(savetoepdtext);
-  savetoepd.onclick = function () {
+  savetoepd.onclick = () => {
     let filecontent = "";
     table.GameList.forEach((val) => {
       filecontent += `${val.ToExtendedPositionDescription(FFishJSLibrary)}\n`;
@@ -1712,7 +1684,7 @@ function ShowPGNOrEPDFileUI(GameList, FFishJSLibrary) {
   close.id = "pgnepd-close";
   let closetext = document.createTextNode("Close");
   close.appendChild(closetext);
-  close.onclick = function () {
+  close.onclick = () => {
     document.dispatchEvent(
       new CustomEvent("uilayoutchange", { detail: { message: null } }),
     );
@@ -1797,7 +1769,7 @@ function ShowPGNOrEPDFileUI(GameList, FFishJSLibrary) {
   search.classList.add("ripple");
   let searchtext = document.createTextNode("Search");
   search.appendChild(searchtext);
-  search.onclick = function () {
+  search.onclick = () => {
     if (searchbox.value == "") {
       table.InitializeTable();
       table.AddRows(GameList);
@@ -1812,7 +1784,7 @@ function ShowPGNOrEPDFileUI(GameList, FFishJSLibrary) {
       );
     }
   };
-  searchbox.onkeyup = function (event) {
+  searchbox.onkeyup = (event) => {
     if (event.keyCode == 13) {
       search.click();
     }
@@ -1839,6 +1811,3 @@ function ShowPGNOrEPDFileUI(GameList, FFishJSLibrary) {
   );
   document.dispatchEvent(new Event("initializeripples"));
 }
-
-window.fairyground.SavedGamesParsingFeature.ShowPGNOrEPDFileUI =
-  ShowPGNOrEPDFileUI;

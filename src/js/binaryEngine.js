@@ -1,4 +1,4 @@
-﻿function ConvertFENtoSFEN(fen) {
+﻿export function ConvertFENtoSFEN(fen) {
   if (typeof fen != "string") {
     return null;
   }
@@ -62,7 +62,7 @@
   return sfen.join(" ");
 }
 
-function convertUCImovestoUSImoves(moves, board_width, board_height) {
+export function convertUCImovestoUSImoves(moves, board_width, board_height) {
   const chartoindex = [
     "z",
     "y",
@@ -169,7 +169,7 @@ function convertUCImovestoUSImoves(moves, board_width, board_height) {
   return movelist.join(" ");
 }
 
-function convertUCImovestoUCCImoves(moves, board_width, board_height) {
+export function convertUCImovestoUCCImoves(moves, board_width, board_height) {
   const chartoindex = [
     "z",
     "y",
@@ -250,7 +250,7 @@ function convertUCImovestoUCCImoves(moves, board_width, board_height) {
   return movelist.join(" ");
 }
 
-function convertUSImovestoUCImoves(moves, board_width, board_height) {
+export function convertUSImovestoUCImoves(moves, board_width, board_height) {
   const chartoindex = [
     "z",
     "y",
@@ -357,7 +357,7 @@ function convertUSImovestoUCImoves(moves, board_width, board_height) {
   return movelist.join(" ");
 }
 
-function convertUCCImovestoUCImoves(moves, board_width, board_height) {
+export function convertUCCImovestoUCImoves(moves, board_width, board_height) {
   const chartoindex = [
     "z",
     "y",
@@ -438,47 +438,19 @@ function convertUCCImovestoUCImoves(moves, board_width, board_height) {
   return movelist.join(" ");
 }
 
-if (window.fairyground) {
-} else {
-  throw TypeError(
-    'Namespace "fairyground" is not defined. Cannot transfer definitions to main page.',
-  );
-}
-
-window.fairyground.BinaryEngineFeature = { super: window.fairyground };
-
-window.fairyground.BinaryEngineFeature.ConvertFENtoSFEN = ConvertFENtoSFEN;
-window.fairyground.BinaryEngineFeature.convertUCCImovestoUCImoves =
-  convertUCCImovestoUCImoves;
-window.fairyground.BinaryEngineFeature.convertUCImovestoUCCImoves =
-  convertUCImovestoUCCImoves;
-window.fairyground.BinaryEngineFeature.convertUCImovestoUSImoves =
-  convertUCImovestoUSImoves;
-window.fairyground.BinaryEngineFeature.convertUSImovestoUCImoves =
-  convertUSImovestoUCImoves;
-
-window.fairyground.BinaryEngineFeature.ws = null;
-window.fairyground.BinaryEngineFeature.WebSocketStatus = "Unestablished";
-window.fairyground.BinaryEngineFeature.WebSocketReconnectionTime = 3;
-
-window.fairyground.BinaryEngineFeature.first_engine = null;
-window.fairyground.BinaryEngineFeature.second_engine = null;
-window.fairyground.BinaryEngineFeature.analysis_engine = null;
+export const WebSocketReconnectionTime = 3;
+export let state = {
+  first_engine: null,
+  second_engine: null,
+  analysis_engine: null,
+};
 
 //let checkconnectionnumber = parseInt(Math.random() * 100000);
-window.fairyground.BinaryEngineFeature.load_engine_timeout = 15000;
+let load_engine_timeout = 15000;
 
 //let i = 0;
 
-window.fairyground.BinaryEngineFeature.wsport = window.location.port;
-if (window.fairyground.BinaryEngineFeature.wsport == "") {
-  window.fairyground.BinaryEngineFeature.wsport = 5001;
-} else {
-  window.fairyground.BinaryEngineFeature.wsport =
-    +window.fairyground.BinaryEngineFeature.wsport + 1;
-}
-
-window.fairyground.BinaryEngineFeature.changing_engine_settings = false;
+let changing_engine_settings = false;
 
 const ProtocolSearchRegExp = new RegExp("(uciok)|(usiok)|(ucciok)", "i");
 const VariantOptionSearchRegExp = new RegExp(
@@ -495,21 +467,15 @@ const WhiteSpaceMatcher = new RegExp("[ ]+", "");
 const LineFeedCarriageReturnMatcher = new RegExp("(\r\n)|(\r)", "g");
 const BoardDimensionMatcher = new RegExp("board[0-9]+x[0-9]+", "");
 
-function GetCurrentVariantID() {
+export function GetCurrentVariantID() {
   return document.getElementById("dropdown-variant").value;
 }
 
-window.fairyground.BinaryEngineFeature.GetCurrentVariantID =
-  GetCurrentVariantID;
-
-function CurrentVariantFischerRandomEnabled() {
+export function CurrentVariantFischerRandomEnabled() {
   return document.getElementById("isfischerrandommode").checked;
 }
 
-window.fairyground.BinaryEngineFeature.CurrentVariantFischerRandomEnabled =
-  CurrentVariantFischerRandomEnabled;
-
-function MakeMoveOnBoard(ucimove) {
+export function MakeMoveOnBoard(ucimove) {
   if (typeof ucimove != "string") {
     throw TypeError();
   }
@@ -519,9 +485,7 @@ function MakeMoveOnBoard(ucimove) {
   applypos.click();
 }
 
-window.fairyground.BinaryEngineFeature.MakeMoveOnBoard = MakeMoveOnBoard;
-
-function GetBoardWidth() {
+export function GetBoardWidth() {
   const ClassList = document.getElementById(
     "chessground-container-div",
   ).classList;
@@ -536,9 +500,7 @@ function GetBoardWidth() {
   return 8;
 }
 
-window.fairyground.BinaryEngineFeature.GetBoardWidth = GetBoardWidth;
-
-function GetBoardHeight() {
+export function GetBoardHeight() {
   const ClassList = document.getElementById(
     "chessground-container-div",
   ).classList;
@@ -553,17 +515,13 @@ function GetBoardHeight() {
   return 8;
 }
 
-window.fairyground.BinaryEngineFeature.GetBoardHeight = GetBoardHeight;
-
-function GetBoardPosition() {
+export function GetBoardPosition() {
   const fen = document.getElementById("fen").value.trim();
   const moves = document.getElementById("move").value.trim();
   return { fen: fen, moves: moves };
 }
 
-window.fairyground.BinaryEngineFeature.GetBoardPosition = GetBoardPosition;
-
-function UpdateOutputSection(color, msg) {
+export function UpdateOutputSection(color, msg) {
   if (typeof color != "string" || typeof msg != "string") {
     throw TypeError();
   }
@@ -586,41 +544,32 @@ function UpdateOutputSection(color, msg) {
   }
 }
 
-window.fairyground.BinaryEngineFeature.UpdateOutputSection =
-  UpdateOutputSection;
-
-function GetCurrentPlayingEngine() {
+export function GetCurrentPlayingEngine() {
   const playwhite = document.getElementById("playwhite");
   const playblack = document.getElementById("playblack");
   const isanalysis = document.getElementById("analysis");
   const stm = document.getElementById("label-stm");
-  if (
-    isanalysis.checked &&
-    window.fairyground.BinaryEngineFeature.analysis_engine != null
-  ) {
+  if (isanalysis.checked && state.analysis_engine != null) {
     return "ANALYSIS";
   }
   if (
     playwhite.checked &&
     stm.innerText == "white" &&
-    window.fairyground.BinaryEngineFeature.first_engine != null
+    state.first_engine != null
   ) {
     return "WHITE";
   }
   if (
     playblack.checked &&
     stm.innerText == "black" &&
-    window.fairyground.BinaryEngineFeature.second_engine != null
+    state.second_engine != null
   ) {
     return "BLACK";
   }
   return "DEFAULT";
 }
 
-window.fairyground.BinaryEngineFeature.GetCurrentPlayingEngine =
-  GetCurrentPlayingEngine;
-
-function EnginePlaysColor(color) {
+export function EnginePlaysColor(color) {
   if (typeof color != "string") {
     throw TypeError();
   }
@@ -633,32 +582,28 @@ function EnginePlaysColor(color) {
       return (
         playwhite.checked &&
         stm.innerText == "white" &&
-        window.fairyground.BinaryEngineFeature.first_engine != null
+        state.first_engine != null
       );
     }
     case "BLACK": {
       return (
         playblack.checked &&
         stm.innerText == "black" &&
-        window.fairyground.BinaryEngineFeature.second_engine != null
+        state.second_engine != null
       );
     }
     case "ANALYSIS": {
-      return (
-        isanalysis.checked &&
-        window.fairyground.BinaryEngineFeature.analysis_engine != null
-      );
+      return isanalysis.checked && state.analysis_engine != null;
     }
     case "DEFAULT": {
       return (
         (playwhite.checked &&
           stm.innerText == "white" &&
-          window.fairyground.BinaryEngineFeature.first_engine == null) ||
+          state.first_engine == null) ||
         (playblack.checked &&
           stm.innerText == "black" &&
-          window.fairyground.BinaryEngineFeature.second_engine == null) ||
-        (isanalysis.checked &&
-          window.fairyground.BinaryEngineFeature.analysis_engine == null)
+          state.second_engine == null) ||
+        (isanalysis.checked && state.analysis_engine == null)
       );
     }
     default: {
@@ -667,9 +612,7 @@ function EnginePlaysColor(color) {
   }
 }
 
-window.fairyground.BinaryEngineFeature.EnginePlaysColor = EnginePlaysColor;
-
-function IsUCIMoveSyntaxCorrect(ucimove) {
+export function IsUCIMoveSyntaxCorrect(ucimove) {
   if (typeof ucimove != "string") {
     return false;
   }
@@ -721,10 +664,7 @@ function IsUCIMoveSyntaxCorrect(ucimove) {
   return false;
 }
 
-window.fairyground.BinaryEngineFeature.IsUCIMoveSyntaxCorrect =
-  IsUCIMoveSyntaxCorrect;
-
-function GetEngineID(color) {
+export function GetEngineID(color) {
   if (typeof color != "string") {
     throw TypeError();
   }
@@ -742,9 +682,7 @@ function GetEngineID(color) {
   return "";
 }
 
-window.fairyground.BinaryEngineFeature.GetEngineID = GetEngineID;
-
-function ParseSavedEngineListMessage(msg) {
+export function ParseSavedEngineListMessage(msg) {
   if (typeof msg != "string") {
     throw TypeError();
   }
@@ -779,10 +717,7 @@ function ParseSavedEngineListMessage(msg) {
   return list;
 }
 
-window.fairyground.BinaryEngineFeature.ParseSavedEngineListMessage =
-  ParseSavedEngineListMessage;
-
-function ConvertEngineListToText(list) {
+export function ConvertEngineListToText(list) {
   if (!Array.isArray(list)) {
     throw TypeError();
   }
@@ -803,14 +738,8 @@ function ConvertEngineListToText(list) {
   return strlist.join("\x01");
 }
 
-window.fairyground.BinaryEngineFeature.ConvertEngineListToText =
-  ConvertEngineListToText;
-
-function GetEngineList(GetFinishCallBack, ws) {
-  if (
-    !WebSocket.prototype.isPrototypeOf(ws) ||
-    typeof GetFinishCallBack != "function"
-  ) {
+export function GetEngineList(GetFinishCallBack, ws) {
+  if (!(ws instanceof WebSocket) || typeof GetFinishCallBack != "function") {
     throw TypeError();
   }
   if (ws.readyState != ws.OPEN) {
@@ -828,10 +757,8 @@ function GetEngineList(GetFinishCallBack, ws) {
   ws.send("GET_ENGINE_LIST");
 }
 
-window.fairyground.BinaryEngineFeature.GetEngineList = GetEngineList;
-
-function SaveEngineList(EngineList, ws) {
-  if (!Array.isArray(EngineList) || !WebSocket.prototype.isPrototypeOf(ws)) {
+export function SaveEngineList(EngineList, ws) {
+  if (!Array.isArray(EngineList) || !(ws instanceof WebSocket)) {
     throw TypeError();
   }
   if (ws.readyState != ws.OPEN) {
@@ -841,9 +768,7 @@ function SaveEngineList(EngineList, ws) {
   ws.send(`SAVE_ENGINE_LIST\x10${text}`);
 }
 
-window.fairyground.BinaryEngineFeature.SaveEngineList = SaveEngineList;
-
-function GetEngineItem(list, id) {
+export function GetEngineItem(list, id) {
   if (!Array.isArray(list) || typeof id != "string") {
     throw TypeError();
   }
@@ -859,9 +784,14 @@ function GetEngineItem(list, id) {
   return null;
 }
 
-window.fairyground.BinaryEngineFeature.GetEngineItem = GetEngineItem;
-
-function SetEngineItem(list, id, path, workdirectory, protocol, options) {
+export function SetEngineItem(
+  list,
+  id,
+  path,
+  workdirectory,
+  protocol,
+  options,
+) {
   if (
     !Array.isArray(list) ||
     typeof id != "string" ||
@@ -885,9 +815,14 @@ function SetEngineItem(list, id, path, workdirectory, protocol, options) {
   });
 }
 
-window.fairyground.BinaryEngineFeature.SetEngineItem = SetEngineItem;
-
-function AddEngineItem(list, id, path, workdirectory, protocol, options) {
+export function AddEngineItem(
+  list,
+  id,
+  path,
+  workdirectory,
+  protocol,
+  options,
+) {
   if (
     !Array.isArray(list) ||
     typeof id != "string" ||
@@ -917,9 +852,7 @@ function AddEngineItem(list, id, path, workdirectory, protocol, options) {
   });
 }
 
-window.fairyground.BinaryEngineFeature.AddEngineItem = AddEngineItem;
-
-function RemoveEngineItem(list, id) {
+export function RemoveEngineItem(list, id) {
   if (!Array.isArray(list) || typeof id != "string") {
     throw TypeError();
   }
@@ -936,9 +869,7 @@ function RemoveEngineItem(list, id) {
   return null;
 }
 
-window.fairyground.BinaryEngineFeature.RemoveEngineItem = RemoveEngineItem;
-
-function IsNullValue(val) {
+export function IsNullValue(val) {
   if (val !== null && val !== undefined && val != "") {
     if (val != "null" && val != "undefined") {
       if (typeof val == "number" && isNaN(val)) {
@@ -951,9 +882,7 @@ function IsNullValue(val) {
   return true;
 }
 
-window.fairyground.BinaryEngineFeature.IsNullValue = IsNullValue;
-
-function DownloadFile(content, fileName, mimeType) {
+export function DownloadFile(content, fileName, mimeType) {
   const blob = new Blob([content], { type: mimeType });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -963,11 +892,9 @@ function DownloadFile(content, fileName, mimeType) {
   document.body.removeChild(a);
 }
 
-window.fairyground.BinaryEngineFeature.DownloadFile = DownloadFile;
-
 //let wsa=new WebSocket("ws");
 
-class Engine {
+export class Engine {
   constructor(
     ID,
     Command,
@@ -986,7 +913,7 @@ class Engine {
       !Array.isArray(Options) ||
       typeof Color != "string" ||
       typeof LoadTimeOut != "number" ||
-      !WebSocket.prototype.isPrototypeOf(WebSocketConnection)
+      !(WebSocketConnection instanceof WebSocket)
     ) {
       throw TypeError();
     }
@@ -2024,13 +1951,8 @@ class Engine {
   }
 }
 
-window.fairyground.BinaryEngineFeature.Engine = Engine;
-
-function ShowEditEngineOptionsUI(EngineClass, DestructOnClose) {
-  if (
-    !Engine.prototype.isPrototypeOf(EngineClass) ||
-    typeof DestructOnClose != "boolean"
-  ) {
+export function ShowEditEngineOptionsUI(EngineClass, DestructOnClose) {
+  if (!(EngineClass instanceof Engine) || typeof DestructOnClose != "boolean") {
     throw TypeError();
   }
   if (!EngineClass.IsLoaded) {
@@ -2039,10 +1961,7 @@ function ShowEditEngineOptionsUI(EngineClass, DestructOnClose) {
   while (document.getElementById("enginesettingspopup") != null) {
     document.getElementById("enginesettingspopup").remove();
   }
-  if (window.fairyground.BinaryEngineFeature.WebSocketStatus != "CONNECTED") {
-    return;
-  }
-  window.fairyground.BinaryEngineFeature.changing_engine_settings = true;
+  changing_engine_settings = true;
   let popup = document.createElement("div");
   popup.id = "enginesettingspopup";
   let background = document.createElement("div");
@@ -2089,7 +2008,7 @@ function ShowEditEngineOptionsUI(EngineClass, DestructOnClose) {
       input.max = value.max;
       input.min = value.min;
       input.value = value.default;
-      input.onchange = function () {
+      input.onchange = () => {
         if (
           !/^(\-|\+)?(0|[1-9][0-9]*)$/.test(
             document.getElementById(value.name.replace(/[ ]/g, "") + "-input")
@@ -2122,7 +2041,7 @@ function ShowEditEngineOptionsUI(EngineClass, DestructOnClose) {
     } else if (value.type == "button") {
       input = document.createElement("button");
       input.classList.add("ripple");
-      input.onclick = function () {
+      input.onclick = () => {
         EngineClass.SetButtonOption(value.name);
       };
       btntext = document.createTextNode(value.name);
@@ -2158,7 +2077,7 @@ function ShowEditEngineOptionsUI(EngineClass, DestructOnClose) {
   cancel.classList.add("ripple");
   let canceltext = document.createTextNode("Close");
   cancel.appendChild(canceltext);
-  cancel.onclick = function () {
+  cancel.onclick = () => {
     document.dispatchEvent(
       new CustomEvent("uilayoutchange", {
         detail: { message: "enginesetuppopup-background" },
@@ -2170,7 +2089,7 @@ function ShowEditEngineOptionsUI(EngineClass, DestructOnClose) {
     while (document.getElementById("enginesettingspopup") != null) {
       document.getElementById("enginesettingspopup").remove();
     }
-    window.fairyground.BinaryEngineFeature.changing_engine_settings = false;
+    changing_engine_settings = false;
     if (DestructOnClose) {
       EngineClass.destructor();
     }
@@ -2178,7 +2097,7 @@ function ShowEditEngineOptionsUI(EngineClass, DestructOnClose) {
   let save = document.createElement("button");
   save.classList.add("ripple");
   let savetext = document.createTextNode("Apply Changes");
-  save.onclick = function () {
+  save.onclick = () => {
     let Elem = null;
     EngineClass.Options.forEach((value, index) => {
       if (value.type == "button") {
@@ -2217,7 +2136,7 @@ function ShowEditEngineOptionsUI(EngineClass, DestructOnClose) {
   let showcurrent = document.createElement("button");
   showcurrent.classList.add("ripple");
   let showcurrenttext = document.createTextNode("Show Current Value");
-  showcurrent.onclick = function () {
+  showcurrent.onclick = () => {
     let Elem = null;
     EngineClass.Options.forEach((value, index) => {
       if (value.type == "button") {
@@ -2252,7 +2171,7 @@ function ShowEditEngineOptionsUI(EngineClass, DestructOnClose) {
   let showdefault = document.createElement("button");
   showdefault.classList.add("ripple");
   let showdefaulttext = document.createTextNode("Show Default Value");
-  showdefault.onclick = function () {
+  showdefault.onclick = () => {
     let Elem = null;
     EngineClass.Options.forEach((value, index) => {
       if (value.type == "button") {
@@ -2288,7 +2207,7 @@ function ShowEditEngineOptionsUI(EngineClass, DestructOnClose) {
   redetectoptions.classList.add("ripple");
   let redetectoptionstext = document.createTextNode("Re-detect");
   redetectoptions.appendChild(redetectoptionstext);
-  redetectoptions.onclick = function () {
+  redetectoptions.onclick = () => {
     EngineClass.RedetectOptions(
       () => {
         let Elem = null;
@@ -2324,7 +2243,7 @@ function ShowEditEngineOptionsUI(EngineClass, DestructOnClose) {
         while (document.getElementById("enginesettingspopup") != null) {
           document.getElementById("enginesettingspopup").remove();
         }
-        window.fairyground.BinaryEngineFeature.changing_engine_settings = false;
+        changing_engine_settings = false;
         setTimeout(() => {
           ShowEditEngineOptionsUI(EngineClass, false);
         }, 10);
@@ -2338,7 +2257,7 @@ function ShowEditEngineOptionsUI(EngineClass, DestructOnClose) {
   actiondiv.appendChild(redetectoptions);
   let redetectoptionshelp = document.createElement("pre");
   redetectoptionshelp.innerText = "[?]";
-  redetectoptionshelp.onclick = function () {
+  redetectoptionshelp.onclick = () => {
     window.alert(
       "On some engines, the options might change after you set some of these values. (e.g. Fairy-Stockfish, when you set VariantPath the UCI_Variant option will change.)\nThis function allows you to re-detect the option values so that the GUI can get the options properly.\nNote that you might need to click <Re-detect> for twice to make this work as the engine probably takes time to parse files while the GUI has no way to detect that.",
     );
@@ -2361,14 +2280,15 @@ function ShowEditEngineOptionsUI(EngineClass, DestructOnClose) {
   document.dispatchEvent(new Event("initializeripples"));
 }
 
-window.fairyground.BinaryEngineFeature.ShowEditEngineOptionsUI =
-  ShowEditEngineOptionsUI;
-
-function ShowEngineSetupUI(EngineList, EngineClass, DestructOnClose, ws) {
+export function ShowEngineSetupUI(
+  EngineList,
+  EngineClass,
+  DestructOnClose,
+  ws,
+) {
   if (
-    (!Engine.prototype.isPrototypeOf(EngineClass) &&
-      EngineClass !== undefined) ||
-    !WebSocket.prototype.isPrototypeOf(ws) ||
+    (!(EngineClass instanceof Engine) && typeof EngineClass != "undefined") ||
+    !(ws instanceof WebSocket) ||
     typeof DestructOnClose != "boolean" ||
     !Array.isArray(EngineList)
   ) {
@@ -2380,14 +2300,12 @@ function ShowEngineSetupUI(EngineList, EngineClass, DestructOnClose, ws) {
   while (document.getElementById("enginesetuppopup") != null) {
     document.getElementById("enginesetuppopup").remove();
   }
-  if (window.fairyground.BinaryEngineFeature.WebSocketStatus != "CONNECTED") {
-    return;
-  }
   if (EngineClass) {
     if (!EngineClass.IsLoaded) {
       throw Error("Engine is not loaded.");
     }
   }
+  let engine_class = EngineClass;
   let newengineobj = undefined;
   let isloadingengine = false;
   let popup = document.createElement("div");
@@ -2467,12 +2385,12 @@ function ShowEngineSetupUI(EngineList, EngineClass, DestructOnClose, ws) {
   protocoldiv.appendChild(engineprotocol);
   protocoldiv.style.marginBottom = "5px";
   popup.appendChild(protocoldiv);
-  if (EngineClass) {
-    engineid.value = EngineClass.ID;
-    enginepath.value = EngineClass.Command;
-    enginewd.value = EngineClass.WorkingDirectory;
+  if (engine_class) {
+    engineid.value = engine_class.ID;
+    enginepath.value = engine_class.Command;
+    enginewd.value = engine_class.WorkingDirectory;
     let index = ["UCI", "UCCI", "USI", "UCI_CYCLONE"];
-    engineprotocol.selectedIndex = index.indexOf(EngineClass.Protocol);
+    engineprotocol.selectedIndex = index.indexOf(engine_class.Protocol);
     //engineid.disabled = true;
   }
   let optionsdiv = document.createElement("div");
@@ -2481,36 +2399,35 @@ function ShowEngineSetupUI(EngineList, EngineClass, DestructOnClose, ws) {
   engineoptionstext.innerText = "Engine Options:";
   let engineoptions = document.createElement("button");
   engineoptions.classList.add("ripple");
-  engineoptions.onclick = function () {
+  engineoptions.onclick = () => {
     if (isloadingengine) {
       window.alert("Engine is loading.");
       return;
     }
-    if (EngineClass) {
+    if (engine_class instanceof Engine) {
       if (
-        enginepath.value.trim() == EngineClass.Command.trim() &&
+        enginepath.value.trim() == engine_class.Command.trim() &&
         engineprotocol[engineprotocol.selectedIndex].value ==
-          EngineClass.Protocol &&
-        enginewd.value == EngineClass.WorkingDirectory
+          engine_class.Protocol &&
+        enginewd.value == engine_class.WorkingDirectory
       ) {
-        ShowEditEngineOptionsUI(EngineClass, false);
+        ShowEditEngineOptionsUI(engine_class, false);
       } else {
-        EngineClass.destructor();
-        EngineClass = undefined;
+        engine_class.destructor();
         isloadingengine = true;
-        EngineClass = new Engine(
+        engine_class = new Engine(
           engineid.value,
           enginepath.value,
           enginewd.value,
           engineprotocol[engineprotocol.selectedIndex].value,
           [],
           "",
-          window.fairyground.BinaryEngineFeature.load_engine_timeout,
+          load_engine_timeout,
           ws,
         );
-        EngineClass.Load(
+        engine_class.Load(
           () => {
-            ShowEditEngineOptionsUI(EngineClass, false);
+            ShowEditEngineOptionsUI(engine_class, false);
             isloadingengine = false;
           },
           (err) => {
@@ -2555,7 +2472,7 @@ function ShowEngineSetupUI(EngineList, EngineClass, DestructOnClose, ws) {
         engineprotocol[engineprotocol.selectedIndex].value,
         [],
         "",
-        window.fairyground.BinaryEngineFeature.load_engine_timeout,
+        load_engine_timeout,
         ws,
       );
       newengineobj.Load(
@@ -2582,14 +2499,14 @@ function ShowEngineSetupUI(EngineList, EngineClass, DestructOnClose, ws) {
   let cancel = document.createElement("button");
   cancel.classList.add("ripple");
   let canceltext = document.createTextNode("Cancel");
-  cancel.onclick = function () {
+  cancel.onclick = () => {
     if (isloadingengine) {
       window.alert("Engine is loading.");
       return;
     }
     if (DestructOnClose) {
-      if (EngineClass) {
-        EngineClass.destructor();
+      if (engine_class instanceof Engine) {
+        engine_class.destructor();
       }
     }
     if (newengineobj) {
@@ -2612,12 +2529,12 @@ function ShowEngineSetupUI(EngineList, EngineClass, DestructOnClose, ws) {
   let confirm = document.createElement("button");
   confirm.classList.add("ripple");
   let confirmtext = document.createTextNode("");
-  if (EngineClass) {
+  if (engine_class) {
     confirmtext.textContent = "Save Changes";
   } else {
     confirmtext.textContent = "Add Engine";
   }
-  confirm.onclick = function () {
+  confirm.onclick = () => {
     if (engineid.value == "" || enginepath.value == "") {
       window.alert("Engine ID and executable path must not be null");
       return;
@@ -2627,55 +2544,41 @@ function ShowEngineSetupUI(EngineList, EngineClass, DestructOnClose, ws) {
       return;
     }
     if (
-      EngineClass !== undefined &&
-      EngineClass.IsLoaded &&
-      enginepath.value.trim() == EngineClass.Command.trim() &&
+      engine_class instanceof Engine &&
+      engine_class.IsLoaded &&
+      enginepath.value.trim() == engine_class.Command.trim() &&
       engineprotocol[engineprotocol.selectedIndex].value ==
-        EngineClass.Protocol &&
-      enginewd.value == EngineClass.WorkingDirectory
+        engine_class.Protocol &&
+      enginewd.value == engine_class.WorkingDirectory
     ) {
-      if (engineid.value != EngineClass.ID) {
+      if (engineid.value != engine_class.ID) {
         if (
           !window.confirm(
-            `The ID has been changed to "${engineid.value}", which is different from the original one (${EngineClass.ID}). If you save the changes, it will be saved as a new engine while the original engine won't be changed. Proceed?`,
+            `The ID has been changed to "${engineid.value}", which is different from the original one (${engine_class.ID}). If you save the changes, it will be saved as a new engine while the original engine won't be changed. Proceed?`,
           )
         ) {
           return;
         }
       }
-      EngineClass.SetID(engineid.value);
-      EngineClass.Command = enginepath.value;
-      EngineClass.Protocol = engineprotocol[engineprotocol.selectedIndex].value;
-      EngineClass.WorkingDirectory = enginewd.value;
-      EngineClass.SaveOptionsToEngineList(EngineList);
-      if (window.fairyground.BinaryEngineFeature.first_engine) {
-        if (
-          window.fairyground.BinaryEngineFeature.first_engine.ID ==
-          EngineClass.ID
-        ) {
-          window.fairyground.BinaryEngineFeature.first_engine.SetOptions(
-            EngineClass.Options,
-          );
+      engine_class.SetID(engineid.value);
+      engine_class.Command = enginepath.value;
+      engine_class.Protocol =
+        engineprotocol[engineprotocol.selectedIndex].value;
+      engine_class.WorkingDirectory = enginewd.value;
+      engine_class.SaveOptionsToEngineList(EngineList);
+      if (state.first_engine instanceof Engine) {
+        if (state.first_engine.ID == engine_class.ID) {
+          state.first_engine.SetOptions(engine_class.Options);
         }
       }
-      if (window.fairyground.BinaryEngineFeature.second_engine) {
-        if (
-          window.fairyground.BinaryEngineFeature.second_engine.ID ==
-          EngineClass.ID
-        ) {
-          window.fairyground.BinaryEngineFeature.second_engine.SetOptions(
-            EngineClass.Options,
-          );
+      if (state.second_engine instanceof Engine) {
+        if (state.second_engine.ID == engine_class.ID) {
+          state.second_engine.SetOptions(engine_class.Options);
         }
       }
-      if (window.fairyground.BinaryEngineFeature.analysis_engine) {
-        if (
-          window.fairyground.BinaryEngineFeature.analysis_engine.ID ==
-          EngineClass.ID
-        ) {
-          window.fairyground.BinaryEngineFeature.analysis_engine.SetOptions(
-            EngineClass.Options,
-          );
+      if (state.analysis_engine instanceof Engine) {
+        if (state.analysis_engine.ID == engine_class.ID) {
+          state.analysis_engine.SetOptions(engine_class.Options);
         }
       }
     } else if (
@@ -2734,10 +2637,8 @@ function ShowEngineSetupUI(EngineList, EngineClass, DestructOnClose, ws) {
   document.dispatchEvent(new Event("initializeripples"));
 }
 
-window.fairyground.BinaryEngineFeature.ShowEngineSetupUI = ShowEngineSetupUI;
-
-function ShowEngineManagementUI(EngineList, ws) {
-  if (!WebSocket.prototype.isPrototypeOf(ws) || !Array.isArray(EngineList)) {
+export function ShowEngineManagementUI(EngineList, ws) {
+  if (!(ws instanceof WebSocket) || !Array.isArray(EngineList)) {
     throw TypeError();
   }
   if (ws.readyState != ws.OPEN) {
@@ -2746,9 +2647,10 @@ function ShowEngineManagementUI(EngineList, ws) {
   while (document.getElementById("enginemanagementpopup") != null) {
     document.getElementById("enginemanagementpopup").remove();
   }
-  if (window.fairyground.BinaryEngineFeature.WebSocketStatus != "CONNECTED") {
+  if (ws.readyState != ws.OPEN) {
     return;
   }
+  console.log("111");
   let isloadingengine = false;
   let popup = document.createElement("div");
   popup.id = "enginemanagementpopup";
@@ -2774,31 +2676,22 @@ function ShowEngineManagementUI(EngineList, ws) {
   engineinfodiv.style.marginBottom = "5px";
   engineinfodiv.style.flexDirection = "column";
   let whiteengineinfo = document.createElement("p");
-  if (
-    window.fairyground.BinaryEngineFeature.first_engine &&
-    window.fairyground.BinaryEngineFeature.first_engine.IsLoaded
-  ) {
-    whiteengineinfo.innerText = `First Engine (WHITE) → ID: ${window.fairyground.BinaryEngineFeature.first_engine.ID} Name: ${window.fairyground.BinaryEngineFeature.first_engine.Name} Author: ${window.fairyground.BinaryEngineFeature.first_engine.Author}`;
+  if (state.first_engine instanceof Engine && state.first_engine.IsLoaded) {
+    whiteengineinfo.innerText = `First Engine (WHITE) → ID: ${state.first_engine.ID} Name: ${state.first_engine.Name} Author: ${state.first_engine.Author}`;
   } else {
     whiteengineinfo.innerText = "First Engine (WHITE) → (Not Loaded)";
   }
   engineinfodiv.appendChild(whiteengineinfo);
   let blackengineinfo = document.createElement("p");
-  if (
-    window.fairyground.BinaryEngineFeature.second_engine &&
-    window.fairyground.BinaryEngineFeature.second_engine.IsLoaded
-  ) {
-    blackengineinfo.innerText = `Second Engine (BLACK) → ID: ${window.fairyground.BinaryEngineFeature.second_engine.ID} Name: ${window.fairyground.BinaryEngineFeature.second_engine.Name} Author: ${window.fairyground.BinaryEngineFeature.second_engine.Author}`;
+  if (state.second_engine instanceof Engine && state.second_engine.IsLoaded) {
+    blackengineinfo.innerText = `Second Engine (BLACK) → ID: ${state.second_engine.ID} Name: ${state.second_engine.Name} Author: ${state.second_engine.Author}`;
   } else {
     blackengineinfo.innerText = "Second Engine (BLACK) → (Not Loaded)";
   }
   engineinfodiv.appendChild(blackengineinfo);
   let analysisengineinfo = document.createElement("p");
-  if (
-    window.fairyground.BinaryEngineFeature.analysis_engine &&
-    window.fairyground.BinaryEngineFeature.analysis_engine.IsLoaded
-  ) {
-    analysisengineinfo.innerText = `Analysis Engine (ANALYSIS) → ID: ${window.fairyground.BinaryEngineFeature.analysis_engine.ID} Name: ${window.fairyground.BinaryEngineFeature.analysis_engine.Name} Author: ${window.fairyground.BinaryEngineFeature.analysis_engine.Author}`;
+  if (state.analysis_engine && state.analysis_engine.IsLoaded) {
+    analysisengineinfo.innerText = `Analysis Engine (ANALYSIS) → ID: ${state.analysis_engine.ID} Name: ${state.analysis_engine.Name} Author: ${state.analysis_engine.Author}`;
   } else {
     analysisengineinfo.innerText = "Analysis Engine (ANALYSIS) → (Not Loaded)";
   }
@@ -2817,7 +2710,7 @@ function ShowEngineManagementUI(EngineList, ws) {
   enginelistdiv.appendChild(availableenginesdropdown);
   let addengine = document.createElement("button");
   addengine.classList.add("ripple");
-  addengine.onclick = function () {
+  addengine.onclick = () => {
     ShowEngineSetupUI(EngineList, undefined, true, ws);
   };
   let addenginetext = document.createTextNode("Add Engine");
@@ -2825,7 +2718,7 @@ function ShowEngineManagementUI(EngineList, ws) {
   enginecontroldiv.appendChild(addengine);
   let removeengine = document.createElement("button");
   removeengine.classList.add("ripple");
-  removeengine.onclick = function () {
+  removeengine.onclick = () => {
     if (availableenginesdropdown.selectedIndex < 0) {
       window.alert("Please select a engine to remove.");
       return;
@@ -2848,7 +2741,7 @@ function ShowEngineManagementUI(EngineList, ws) {
   enginecontroldiv.appendChild(removeengine);
   let editsettings = document.createElement("button");
   editsettings.classList.add("ripple");
-  editsettings.onclick = function () {
+  editsettings.onclick = () => {
     if (availableenginesdropdown.selectedIndex < 0) {
       window.alert("Please select a engine.");
       return;
@@ -2868,7 +2761,7 @@ function ShowEngineManagementUI(EngineList, ws) {
       enginesettings.protocol,
       enginesettings.options,
       "",
-      window.fairyground.BinaryEngineFeature.load_engine_timeout,
+      load_engine_timeout,
       ws,
     );
     engineobj.Load(
@@ -2887,13 +2780,13 @@ function ShowEngineManagementUI(EngineList, ws) {
   enginecontroldiv.appendChild(editsettings);
   let selectaswhite = document.createElement("button");
   selectaswhite.classList.add("ripple");
-  selectaswhite.onclick = function () {
-    if (window.fairyground.BinaryEngineFeature.first_engine) {
-      if (window.fairyground.BinaryEngineFeature.first_engine.IsLoading) {
+  selectaswhite.onclick = () => {
+    if (state.first_engine instanceof Engine) {
+      if (state.first_engine.IsLoading) {
         window.alert("Engine is loading, please wait...");
         return;
       }
-      window.fairyground.BinaryEngineFeature.first_engine.destructor();
+      state.first_engine.destructor();
     }
     if (availableenginesdropdown.selectedIndex < 0) {
       window.alert("Please select a engine.");
@@ -2909,10 +2802,10 @@ function ShowEngineManagementUI(EngineList, ws) {
       enginesettings.protocol,
       enginesettings.options,
       "WHITE",
-      window.fairyground.BinaryEngineFeature.load_engine_timeout,
+      load_engine_timeout,
       ws,
     );
-    window.fairyground.BinaryEngineFeature.first_engine = engineobj;
+    state.first_engine = engineobj;
     engineobj.Load(
       (name, author) => {
         whiteengineinfo.innerText = `First Engine (WHITE) → ID: ${id} Name: ${name} Author: ${author}`;
@@ -2930,13 +2823,13 @@ function ShowEngineManagementUI(EngineList, ws) {
   enginecontroldiv.appendChild(selectaswhite);
   let selectasblack = document.createElement("button");
   selectasblack.classList.add("ripple");
-  selectasblack.onclick = function () {
-    if (window.fairyground.BinaryEngineFeature.second_engine) {
-      if (window.fairyground.BinaryEngineFeature.second_engine.IsLoading) {
+  selectasblack.onclick = () => {
+    if (state.second_engine instanceof Engine) {
+      if (state.second_engine.IsLoading) {
         window.alert("Engine is loading, please wait...");
         return;
       }
-      window.fairyground.BinaryEngineFeature.second_engine.destructor();
+      state.second_engine.destructor();
     }
     if (availableenginesdropdown.selectedIndex < 0) {
       window.alert("Please select a engine.");
@@ -2952,10 +2845,10 @@ function ShowEngineManagementUI(EngineList, ws) {
       enginesettings.protocol,
       enginesettings.options,
       "BLACK",
-      window.fairyground.BinaryEngineFeature.load_engine_timeout,
+      load_engine_timeout,
       ws,
     );
-    window.fairyground.BinaryEngineFeature.second_engine = engineobj;
+    state.second_engine = engineobj;
     engineobj.Load(
       (name, author) => {
         blackengineinfo.innerText = `Second Engine (BLACK) → ID: ${id} Name: ${name} Author: ${author}`;
@@ -2973,13 +2866,13 @@ function ShowEngineManagementUI(EngineList, ws) {
   enginecontroldiv.appendChild(selectasblack);
   let selectasanalysis = document.createElement("button");
   selectasanalysis.classList.add("ripple");
-  selectasanalysis.onclick = function () {
-    if (window.fairyground.BinaryEngineFeature.analysis_engine) {
-      if (window.fairyground.BinaryEngineFeature.analysis_engine.IsLoading) {
+  selectasanalysis.onclick = () => {
+    if (state.analysis_engine) {
+      if (state.analysis_engine.IsLoading) {
         window.alert("Engine is loading, please wait...");
         return;
       }
-      window.fairyground.BinaryEngineFeature.analysis_engine.destructor();
+      state.analysis_engine.destructor();
     }
     if (availableenginesdropdown.selectedIndex < 0) {
       window.alert("Please select a engine.");
@@ -2995,10 +2888,10 @@ function ShowEngineManagementUI(EngineList, ws) {
       enginesettings.protocol,
       enginesettings.options,
       "ANALYSIS",
-      window.fairyground.BinaryEngineFeature.load_engine_timeout,
+      load_engine_timeout,
       ws,
     );
-    window.fairyground.BinaryEngineFeature.analysis_engine = engineobj;
+    state.analysis_engine = engineobj;
     engineobj.Load(
       (name, author) => {
         analysisengineinfo.innerText = `Analysis Engine (ANALYSIS) → ID: ${id} Name: ${name} Author: ${author}`;
@@ -3024,7 +2917,7 @@ function ShowEngineManagementUI(EngineList, ws) {
   savelist.classList.add("ripple");
   let savelisttext = document.createTextNode("Save Engine List");
   savelist.appendChild(savelisttext);
-  savelist.onclick = function () {
+  savelist.onclick = () => {
     if (
       !window.confirm(
         "Save added engines? The saved data will be replaced with current list.",
@@ -3046,7 +2939,7 @@ function ShowEngineManagementUI(EngineList, ws) {
   loadlist.classList.add("ripple");
   let loadlisttext = document.createTextNode("Load Engine List");
   loadlist.appendChild(loadlisttext);
-  loadlist.onclick = function () {
+  loadlist.onclick = () => {
     let listmsg = localStorage.getItem("fairyground-EngineList");
     if (listmsg) {
       let newlist = ParseSavedEngineListMessage(listmsg).reverse();
@@ -3073,7 +2966,7 @@ function ShowEngineManagementUI(EngineList, ws) {
   savelisttofile.classList.add("ripple");
   let savelisttofiletext = document.createTextNode("Save Engine List To File");
   savelisttofile.appendChild(savelisttofiletext);
-  savelisttofile.onclick = function () {
+  savelisttofile.onclick = () => {
     DownloadFile(
       ConvertEngineListToText(EngineList),
       "EngineList.txt",
@@ -3086,7 +2979,7 @@ function ShowEngineManagementUI(EngineList, ws) {
     "Load Engine List From File",
   );
   loadlistfromfile.appendChild(loadlistfromfiletext);
-  loadlistfromfile.onclick = function () {
+  loadlistfromfile.onclick = () => {
     while (document.getElementById("EngineListFileSelect") != null) {
       document.getElementById("EngineListFileSelect").remove();
     }
@@ -3094,12 +2987,12 @@ function ShowEngineManagementUI(EngineList, ws) {
     fileInput.type = "file";
     fileInput.id = "EngineListFileSelect";
     fileInput.style.display = "none";
-    fileInput.addEventListener("change", function (event) {
+    fileInput.addEventListener("change", (event) => {
       const file = event.target.files[0];
       if (file && file.type.startsWith("text/")) {
         const reader = new FileReader();
 
-        reader.onload = function (event) {
+        reader.onload = (event) => {
           let text = event.target.result;
           let newlist = ParseSavedEngineListMessage(text).reverse();
           EngineList.splice(0, EngineList.length);
@@ -3132,20 +3025,20 @@ function ShowEngineManagementUI(EngineList, ws) {
   cancel.classList.add("ripple");
   let canceltext = document.createTextNode("Close");
   cancel.appendChild(canceltext);
-  cancel.onclick = function () {
+  cancel.onclick = () => {
     if (isloadingengine) {
       window.alert("Engine is loading, please wait...");
       return;
     }
     const SelectedIndex =
       document.getElementById("dropdown-variant").selectedIndex;
-    if (window.fairyground.BinaryEngineFeature.first_engine) {
-      if (window.fairyground.BinaryEngineFeature.first_engine.IsLoading) {
+    if (state.first_engine instanceof Engine) {
+      if (state.first_engine.IsLoading) {
         window.alert("Engine is loading, please wait...");
         return;
       }
       if (
-        window.fairyground.BinaryEngineFeature.first_engine.SetVariant(
+        state.first_engine.SetVariant(
           document.getElementById("dropdown-variant")[SelectedIndex].value,
           document.getElementById("isfischerrandommode").checked,
         )
@@ -3155,13 +3048,13 @@ function ShowEngineManagementUI(EngineList, ws) {
         document.getElementById("whiteunsupportedvariant").hidden = false;
       }
     }
-    if (window.fairyground.BinaryEngineFeature.second_engine) {
-      if (window.fairyground.BinaryEngineFeature.second_engine.IsLoading) {
+    if (state.second_engine instanceof Engine) {
+      if (state.second_engine.IsLoading) {
         window.alert("Engine is loading, please wait...");
         return;
       }
       if (
-        window.fairyground.BinaryEngineFeature.second_engine.SetVariant(
+        state.second_engine.SetVariant(
           document.getElementById("dropdown-variant")[SelectedIndex].value,
           document.getElementById("isfischerrandommode").checked,
         )
@@ -3171,13 +3064,13 @@ function ShowEngineManagementUI(EngineList, ws) {
         document.getElementById("blackunsupportedvariant").hidden = false;
       }
     }
-    if (window.fairyground.BinaryEngineFeature.analysis_engine) {
-      if (window.fairyground.BinaryEngineFeature.analysis_engine.IsLoading) {
+    if (state.analysis_engine instanceof Engine) {
+      if (state.analysis_engine.IsLoading) {
         window.alert("Engine is loading, please wait...");
         return;
       }
       if (
-        window.fairyground.BinaryEngineFeature.analysis_engine.SetVariant(
+        state.analysis_engine.SetVariant(
           document.getElementById("dropdown-variant")[SelectedIndex].value,
           document.getElementById("isfischerrandommode").checked,
         )
@@ -3205,15 +3098,15 @@ function ShowEngineManagementUI(EngineList, ws) {
   supportedvariants.classList.add("ripple");
   let supportedvariantstext = document.createTextNode("Supported Variants");
   supportedvariants.appendChild(supportedvariantstext);
-  supportedvariants.onclick = function () {
+  supportedvariants.onclick = () => {
     window.alert(
-      `First Engine:\n${window.fairyground.BinaryEngineFeature.first_engine ? window.fairyground.BinaryEngineFeature.first_engine.Variants.toString().replace(/,/g, ", ") : "(Not loaded)"}`,
+      `First Engine:\n${state.first_engine instanceof Engine ? state.first_engine.Variants.toString().replace(/,/g, ", ") : "(Not loaded)"}`,
     );
     window.alert(
-      `Second Engine:\n${window.fairyground.BinaryEngineFeature.second_engine ? window.fairyground.BinaryEngineFeature.second_engine.Variants.toString().replace(/,/g, ", ") : "(Not loaded)"}`,
+      `Second Engine:\n${state.second_engine instanceof Engine ? state.second_engine.Variants.toString().replace(/,/g, ", ") : "(Not loaded)"}`,
     );
     window.alert(
-      `Analysis Engine:\n${window.fairyground.BinaryEngineFeature.analysis_engine ? window.fairyground.BinaryEngineFeature.analysis_engine.Variants.toString().replace(/,/g, ", ") : "(Not loaded)"}`,
+      `Analysis Engine:\n${state.analysis_engine instanceof Engine ? state.analysis_engine.Variants.toString().replace(/,/g, ", ") : "(Not loaded)"}`,
     );
   };
   popup.appendChild(supportedvariants);
@@ -3223,18 +3116,18 @@ function ShowEngineManagementUI(EngineList, ws) {
     "Re-detect Supported Variants",
   );
   redetectsupportedvariants.appendChild(redetectsupportedvariantstext);
-  redetectsupportedvariants.onclick = function () {
-    if (window.fairyground.BinaryEngineFeature.first_engine) {
-      if (window.fairyground.BinaryEngineFeature.first_engine.IsLoading) {
+  redetectsupportedvariants.onclick = () => {
+    if (state.first_engine instanceof Engine) {
+      if (state.first_engine.IsLoading) {
         window.alert(
           "First engine is loading. Please wait for all engines to be loaded before performing this action.",
         );
         return;
       }
-      window.fairyground.BinaryEngineFeature.first_engine.RedetectOptions(
+      state.first_engine.RedetectOptions(
         () => {
           let Elem = null;
-          let EngineClass = window.fairyground.BinaryEngineFeature.first_engine;
+          let EngineClass = state.first_engine;
           EngineClass.Options.forEach((value, index) => {
             if (value.type == "button") {
               return;
@@ -3269,18 +3162,17 @@ function ShowEngineManagementUI(EngineList, ws) {
         },
       );
     }
-    if (window.fairyground.BinaryEngineFeature.second_engine) {
-      if (window.fairyground.BinaryEngineFeature.second_engine.IsLoading) {
+    if (state.second_engine instanceof Engine) {
+      if (state.second_engine.IsLoading) {
         window.alert(
           "Second engine is loading. Please wait for all engines to be loaded before performing this action.",
         );
         return;
       }
-      window.fairyground.BinaryEngineFeature.second_engine.RedetectOptions(
+      state.second_engine.RedetectOptions(
         () => {
           let Elem = null;
-          let EngineClass =
-            window.fairyground.BinaryEngineFeature.second_engine;
+          let EngineClass = state.second_engine;
           EngineClass.Options.forEach((value, index) => {
             if (value.type == "button") {
               return;
@@ -3315,18 +3207,17 @@ function ShowEngineManagementUI(EngineList, ws) {
         },
       );
     }
-    if (window.fairyground.BinaryEngineFeature.analysis_engine) {
-      if (window.fairyground.BinaryEngineFeature.analysis_engine.IsLoading) {
+    if (state.analysis_engine instanceof Engine) {
+      if (state.analysis_engine.IsLoading) {
         window.alert(
           "Analysis engine is loading. Please wait for all engines to be loaded before performing this action.",
         );
         return;
       }
-      window.fairyground.BinaryEngineFeature.analysis_engine.RedetectOptions(
+      state.analysis_engine.RedetectOptions(
         () => {
           let Elem = null;
-          let EngineClass =
-            window.fairyground.BinaryEngineFeature.analysis_engine;
+          let EngineClass = state.analysis_engine;
           EngineClass.Options.forEach((value, index) => {
             if (value.type == "button") {
               return;
@@ -3376,6 +3267,3 @@ function ShowEngineManagementUI(EngineList, ws) {
   );
   document.dispatchEvent(new Event("initializeripples"));
 }
-
-window.fairyground.BinaryEngineFeature.ShowEngineManagementUI =
-  ShowEngineManagementUI;
