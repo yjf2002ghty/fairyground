@@ -10,6 +10,7 @@ import * as imageutil from "./image.js";
 import * as themeutil from "./chessgroundtheme.js";
 import * as myvariants from "./myVariants.js";
 import * as evalhistory from "./evalhistory.js";
+import * as boardpeek from "./boardInMoveListPanel.js";
 import * as fge from "./binaryEngine.js";
 import * as fgs from "./savedGames.js";
 
@@ -952,17 +953,21 @@ class GameTree {
     return result.join(" ").replace(/\n/g, "\\n");
   }
 
-  ToPGNDiv(Notation, Mode = "flat") {
-    if (Notation == null || typeof Mode != "string") {
+  ToPGNDiv(Notation, Mode = "flat", Orientation = "white") {
+    if (
+      Notation == null ||
+      typeof Mode != "string" ||
+      typeof Orientation != "string"
+    ) {
       throw TypeError();
     }
     function new_info_struct() {
       return {
         text_content: "",
         fenstr: "",
-        lastmove: "",
+        lastmove: [],
         moveturn: "",
-        checked: [""],
+        checked: [],
         gameresult: "",
         startingfen: "",
         moves: "",
@@ -997,6 +1002,12 @@ class GameTree {
     let evalstr = "";
     let pgn_container_vnodes = [];
     let vnode_types = [];
+    let previous_onclick_handler = null;
+
+    const dimensions = getDimensions(tmpboard);
+    const board_width = dimensions.width;
+    const board_height = dimensions.height;
+    const has_pocket = this.OriginalFEN.includes("[");
 
     const VNODE_SPLITTER_START = 0;
     const VNODE_SPLITTER_END = 1;
@@ -1005,6 +1016,28 @@ class GameTree {
     const VNODE_SECOND_MOVE = 4;
     const VNODE_INLINE_OBJECT = 5;
     const VNODE_BLOCK_OBJECT = 6;
+
+    info_struct.moveturn = tmpboard.turn() ? "white" : "black";
+    info_struct.checked = getCheckSquares(tmpboard);
+    info_struct.gameresult = getBoardResult(tmpboard);
+    info_struct.startingfen = info_struct.fenstr = this.OriginalFEN;
+
+    let _info_struct_pointer = info_struct;
+    previous_onclick_handler = (event) => {
+      if (event instanceof PointerEvent) {
+        if (isGameStarted.checked) {
+          onMoveElementClicked(_info_struct_pointer, event.target);
+        } else {
+          if (
+            _info_struct_pointer.moves !=
+            textMoves.value.trim().replace(SpaceReplacer, " ")
+          ) {
+            textMoves.value = _info_struct_pointer.moves;
+            buttonSetFen.click();
+          }
+        }
+      }
+    };
 
     for (i = 0; i < tokens.length; i++) {
       if (tokens[i].IsSplitter) {
@@ -1128,25 +1161,26 @@ class GameTree {
           info_struct.startingfen = this.OriginalFEN;
           info_struct.moves = movestack.join(" ");
           let info_struct_pointer = info_struct; // Create new pointer variable to point to correct object, as info_struct will be overwritten in the loop
+          previous_onclick_handler = (event) => {
+            if (event instanceof PointerEvent) {
+              if (isGameStarted.checked) {
+                onMoveElementClicked(info_struct_pointer, event.target);
+              } else {
+                if (
+                  info_struct_pointer.moves !=
+                  textMoves.value.trim().replace(SpaceReplacer, " ")
+                ) {
+                  textMoves.value = info_struct_pointer.moves;
+                  buttonSetFen.click();
+                }
+              }
+            }
+          };
           pgn_container_vnodes.push(
             m(
               `p.position-display-label${tokens[i].Node == this.CurrentMove ? ".current-move" : ""}`,
               {
-                onclick: (event) => {
-                  if (event instanceof PointerEvent) {
-                    if (isGameStarted.checked) {
-                      onMoveElementClicked(info_struct_pointer, event.target);
-                    } else {
-                      if (
-                        info_struct_pointer.moves !=
-                        textMoves.value.trim().replace(SpaceReplacer, " ")
-                      ) {
-                        textMoves.value = info_struct_pointer.moves;
-                        buttonSetFen.click();
-                      }
-                    }
-                  }
-                },
+                onclick: previous_onclick_handler,
               },
               info_struct.text_content,
             ),
@@ -1241,8 +1275,6 @@ class GameTree {
               vnode_types.push(VNODE_BLOCK_OBJECT);
             }
           }
-          if (tokens[i].Move.TextAfter.includes("[#]")) {
-          }
 
           displaytextafter = tokens[i].Move.TextAfter.replace(
             MoveTextActionPartsMatcher,
@@ -1255,6 +1287,32 @@ class GameTree {
               m(
                 `p.text-after${tokens[i].Move.TextAfter.includes("\n") ? ".full-line" : ""}`,
                 displaytextafter,
+              ),
+            );
+            vnode_types.push(VNODE_BLOCK_OBJECT);
+          }
+          if (tokens[i].Move.TextAfter.includes("[#]")) {
+            displaytextafter += "[#]";
+            pgn_container_vnodes.push(
+              m(
+                "div.board-peek",
+                {
+                  title:
+                    "Preview of the position. Click to go to this position.",
+                  onclick: previous_onclick_handler,
+                },
+                [
+                  boardpeek.GenerateBoardDisplayElement(
+                    info_struct.fenstr.split(" ")[0],
+                    info_struct.lastmove.join(""),
+                    info_struct.checked,
+                    has_pocket,
+                    Orientation,
+                    board_width,
+                    board_height,
+                    themedetector,
+                  ),
+                ],
               ),
             );
             vnode_types.push(VNODE_BLOCK_OBJECT);
@@ -1421,7 +1479,7 @@ class GameTree {
                 current_list.push(generate_move_element(current_move_element));
                 current_move_element = new_move_grid();
               }
-              current_list.push(m("div.grid-block"), [pgn_container_vnodes[i]]);
+              current_list.push(m("div.grid-block", [pgn_container_vnodes[i]]));
             }
           } else {
             current_list.push(pgn_container_vnodes[i]);
@@ -13394,7 +13452,7 @@ let evalhistorygraph = new evalhistory.EvaluationHistoryGraph(
     let moves = gametree
       .GetCompleteMainLineMoveListOfMove(gametree.CurrentMove)
       .split(" ");
-    if (index >= 0 && index < moves.length && !isGameStarted.checked) {
+    if (index >= 0 && index <= moves.length && !isGameStarted.checked) {
       textMoves.value = moves.slice(0, index).join(" ");
       buttonSetFen.click();
     }
@@ -13404,6 +13462,7 @@ let evalhistorygraph = new evalhistory.EvaluationHistoryGraph(
 document.addEventListener("themechange", (event) => {
   if (event instanceof CustomEvent) {
     themedetector.SetThemes(event.detail.piece, event.detail.board);
+    updatePGNDivision(false);
   }
 });
 
@@ -13659,7 +13718,7 @@ function initBoard(variant) {
 
   const config = {
     autoCastle: false,
-    dimensions: getDimensions(),
+    dimensions: getDimensions(board),
     fen: fenBoard,
     movable: {
       free: true,
@@ -13684,7 +13743,7 @@ function initBoard(variant) {
   };
 
   const configmini = {
-    dimensions: getDimensions(),
+    dimensions: getDimensions(board),
     fen: fenBoard,
     movable: {
       color: undefined,
@@ -13803,7 +13862,7 @@ function rerenderChessgroundPockets(falsefen) {
   let state = chessground.state;
   let pockettoplength = 0;
   let pocketbottomlength = 0;
-  let dimensions = getDimensions();
+  let dimensions = getDimensions(board);
   let elements = {
     board: mainboard,
     pocketTop: pocketTopEl,
@@ -13855,7 +13914,7 @@ function redrawChessground(customFEN) {
   }
   const config = {
     autoCastle: false,
-    dimensions: getDimensions(),
+    dimensions: getDimensions(board),
     orientation: chessground.state.orientation,
     fen: fenBoard,
     check: chessground.state.check,
@@ -14665,7 +14724,7 @@ function GenerateBoardImage(
   ) {
     throw TypeError();
   }
-  let dimensions = getDimensions();
+  let dimensions = getDimensions(board);
   let asseturl = themedetector.GetThemes();
   let coordcolors = themedetector.GetInnerCoordinateColor();
   let moves = gametree.GetMoveListOfMove(gametree.CurrentMove);
@@ -15451,7 +15510,7 @@ function getNotation(
           result = tmpboard.fen() + "|" + ucimoves;
         } else if (notation == "FEN+USIMOVE") {
           tmpboard.setFen(startfen);
-          let dimensions = getDimensions();
+          let dimensions = getDimensions(board);
           const convertedmoves = fge.convertUCImovestoUSImoves(
             ucimoves,
             dimensions.width,
@@ -15466,7 +15525,7 @@ function getNotation(
           }
         } else if (notation == "FEN+UCCIMOVE") {
           tmpboard.setFen(startfen);
-          let dimensions = getDimensions();
+          let dimensions = getDimensions(board);
           const convertedmoves = fge.convertUCImovestoUCCImoves(
             ucimoves,
             dimensions.width,
@@ -15481,7 +15540,7 @@ function getNotation(
           }
         } else if (notation == "SFEN+USIMOVE") {
           tmpboard.setFen(startfen);
-          let dimensions = getDimensions();
+          let dimensions = getDimensions(board);
           const convertedmoves = fge.convertUCImovestoUSImoves(
             ucimoves,
             dimensions.width,
@@ -15567,7 +15626,7 @@ function onPositionSet() {
   recordedmultipv = 1;
 }
 
-function getDimensions() {
+function getDimensions(board) {
   if (!board) {
     return {
       width: 8,
@@ -15653,9 +15712,9 @@ new Module().then((loadedModule) => {
       );
       return;
     }
-    const oldDimensions = getDimensions();
+    const oldDimensions = getDimensions(board);
     initBoard(dropdownVariant.value);
-    const newDimensions = getDimensions();
+    const newDimensions = getDimensions(board);
     chessgroundContainerEl.setAttribute(
       "style",
       `--files:${newDimensions.width};--ranks:${newDimensions.height}`,
@@ -15714,6 +15773,7 @@ new Module().then((loadedModule) => {
     pBoardOrientation.textContent = chessground.state.orientation;
     pBoardOrientation.click();
     updateInnerCoordinateColor(chessground);
+    updatePGNDivision(false);
   };
 
   buttonUndo.onclick = function () {
@@ -16294,6 +16354,8 @@ new Module().then((loadedModule) => {
     }
     themedetector.SetOrientation(chessground.state.orientation);
     timerElapsePreviousPlayer = false;
+
+    updatePGNDivision(false);
 
     // Force coordinate recalculation to fix coordinate mapping issues
     // This addresses the bug where coordinates get messed up after game start
@@ -18396,6 +18458,7 @@ function getPgnDiv(board) {
     return gametree.ToPGNDiv(
       ffishnotationobjects[notationindex],
       dropdownPGNStyle[dropdownPGNStyle.selectedIndex].value,
+      chessground.state.orientation,
     );
   }
 }

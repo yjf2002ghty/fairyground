@@ -1680,6 +1680,81 @@ button.inioption {
   font-size: 13px;
 }
 
+#pgndiv .board-peek {
+  width: 100%;
+}
+
+#pgndiv .pgn-board-element {
+  width: 200px;
+  height: calc(200px / var(--pgn-board-aspect-ratio));
+}
+
+#pgndiv .pgn-board-pocket-top,
+#pgndiv .pgn-board-board,
+#pgndiv .pgn-board-pocket-bottom {
+  position: relative;
+}
+
+#pgndiv .pgn-board-pocket-top,
+#pgndiv .pgn-board-pocket-bottom {
+  background-color: #888;
+}
+
+#pgndiv .pgn-board-board {
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+#pgndiv .pgn-board-pocket-top > *,
+#pgndiv .pgn-board-board > *,
+#pgndiv .pgn-board-pocket-bottom > * {
+  position: absolute;
+}
+
+#pgndiv .piece {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+#pgndiv .last-move-square {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(155, 199, 0, 0.41);
+}
+
+#pgndiv .checked-square {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 0, 0, 1) 0%,
+    rgba(231, 0, 0, 1) 25%,
+    rgba(169, 0, 0, 0) 89%,
+    rgba(158, 0, 0, 0) 100%
+  );
+}
+
+#pgndiv .piece-count {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 25%;
+  height: 25%;
+  color: var(--accent-ink);
+  background-color: var(--bad);
+}
+
 #pgndiv .needs-attention-sign {
   background-color: #fef6d5;
   color: #e96725;
