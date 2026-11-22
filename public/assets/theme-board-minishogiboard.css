@@ -1,3 +1,8 @@
+/* Aspect ratio = width / height */
+.minishogiboard.board5x5 cg-board {
+  --square-aspect-ratio: 0.8666666;
+}
+
 .minishogiboard.board5x5 cg-board::before {
   background-image: url("images/board/minishogi/minishogi.svg");
   width: 100%;
@@ -17,14 +22,4 @@
   height: calc(500px * 0.5);
   position: relative;
   display: block;
-}
-
-.minishogiboard.board5x5 .cg-wrap piece {
-  position: absolute;
-  margin-left: -5px;
-}
-
-.minishogiboard.board5x5 .cg-wrap.micro piece {
-  position: absolute;
-  margin-left: -2.5px;
 }

@@ -27,6 +27,10 @@
   background-position: center;
 }
 
+#pagebackground.simple {
+  background-image: url("./images/ui/fsf/FSF.avif");
+}
+
 html {
   background: transparent;
 }

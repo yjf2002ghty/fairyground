@@ -31,13 +31,6 @@ export function GenerateBoardDisplayElement(
   BoardHeight,
   ThemeDetector,
 ) {
-  // console.log(typeof StatelessFEN != "string")
-  // console.log(typeof LastMove != "string")
-  // console.log(!(CheckedSquares instanceof Array))
-  // console.log(typeof HasPocket != "boolean")
-  // console.log(typeof Orientation != "string")
-  // console.log(typeof BoardWidth != "number")
-  // console.log(typeof BoardHeight != "number")
   if (
     typeof StatelessFEN != "string" ||
     typeof LastMove != "string" ||
@@ -130,8 +123,7 @@ export function GenerateBoardDisplayElement(
     }
   }
 
-  const square_height = 100 / BoardHeight;
-  const square_width = 100 / BoardWidth;
+  const pocket_square_width = 100 / pocketsize;
 
   if (Orientation == "white") {
     for (i = 0; i < whitepocket.length; i++) {
@@ -139,13 +131,13 @@ export function GenerateBoardDisplayElement(
         m(
           "div.pocket-square",
           {
-            style: `left: ${i * square_width}%; top: 0; width: ${square_width}%; height: ${square_height}%;`,
+            style: `left: ${(i / pocketsize) * 100}%; top: 0; width: ${pocket_square_width}%; height: 100%;`,
           },
           [
             m("div.piece", {
               style: `background-image: url("${theme.pieces.get(whitepocket[i])}");`,
             }),
-            m("div.piece-count", `${pocket.white.get(whitepocket[i])}`),
+            m("p.piece-count", `${pocket.white.get(whitepocket[i])}`),
           ],
         ),
       );
@@ -155,13 +147,13 @@ export function GenerateBoardDisplayElement(
         m(
           "div.pocket-square",
           {
-            style: `left: ${i * square_width}%; top: 0; width: ${square_width}%; height: ${square_height}%;`,
+            style: `left: ${(i / pocketsize) * 100}%; top: 0; width: ${pocket_square_width}%; height: 100%;`,
           },
           [
             m("div.piece", {
               style: `background-image: url("${theme.pieces.get(blackpocket[i])}");`,
             }),
-            m("div.piece-count", `${pocket.black.get(blackpocket[i])}`),
+            m("p.piece-count", `${pocket.black.get(blackpocket[i])}`),
           ],
         ),
       );
@@ -173,13 +165,13 @@ export function GenerateBoardDisplayElement(
         m(
           "div.pocket-square",
           {
-            style: `left: ${i * square_width}%; top: 0; width: ${square_width}%; height: ${square_height}%;`,
+            style: `left: ${(i / pocketsize) * 100}%; top: 0; width: ${pocket_square_width}%; height: 100%;`,
           },
           [
             m("div.piece", {
               style: `background-image: url("${theme.pieces.get(whitepocket[i])}");`,
             }),
-            m("div.piece-count", `${pocket.white.get(whitepocket[i])}`),
+            m("p.piece-count", `${pocket.white.get(whitepocket[i])}`),
           ],
         ),
       );
@@ -189,18 +181,21 @@ export function GenerateBoardDisplayElement(
         m(
           "div.pocket-square",
           {
-            style: `left: ${i * square_width}%; top: 0; width: ${square_width}%; height: ${square_height}%;`,
+            style: `left: ${(i / pocketsize) * 100}%; top: 0; width: ${pocket_square_width}%; height: 100%;`,
           },
           [
             m("div.piece", {
               style: `background-image: url("${theme.pieces.get(blackpocket[i])}");`,
             }),
-            m("div.piece-count", `${pocket.black.get(blackpocket[i])}`),
+            m("p.piece-count", `${pocket.black.get(blackpocket[i])}`),
           ],
         ),
       );
     }
   }
+
+  const square_height = 100 / BoardHeight;
+  const square_width = 100 / BoardWidth;
 
   let rank = 0;
   let file = 0;

@@ -36,6 +36,16 @@
   background-position: center;
 }
 
+#pagebackground.simple {
+  background-image: url("./images/ui/sunset/sunset.avif");
+}
+
+h1,
+h2,
+.bg-highlight {
+  text-shadow: var(--text-shadow-style-white);
+}
+
 html {
   background: transparent;
 }

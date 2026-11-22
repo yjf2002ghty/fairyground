@@ -22,6 +22,10 @@
   background-position: center;
 }
 
+#pagebackground.simple {
+  background-image: url("./images/ui/chess/chess.avif");
+}
+
 html {
   background: transparent;
 }

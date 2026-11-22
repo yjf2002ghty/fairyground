@@ -133,6 +133,7 @@ cg-board square.current-premove {
   width: calc(100% / var(--files, 8));
   height: calc(100% / var(--ranks, 8));
   background-size: cover;
+  background-position: center;
   z-index: 2;
   will-change: transform;
   pointer-events: none;

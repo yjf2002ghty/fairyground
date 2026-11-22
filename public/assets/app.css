@@ -1655,11 +1655,26 @@ button.inioption {
   gap: 6px 8px;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   width: 45%;
+}
+
+#pgndiv .move-grid > .half-move-column {
+  display: flex;
+  flex-direction: row;
+  gap: 6px 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  width: 90%;
 }
 
 #pgndiv .grid-block {
   width: 100%;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-start;
 }
 
 #pgndiv .full-line {
@@ -1682,11 +1697,14 @@ button.inioption {
 
 #pgndiv .board-peek {
   width: 100%;
+  cursor: pointer;
 }
 
 #pgndiv .pgn-board-element {
   width: 200px;
-  height: calc(200px / var(--pgn-board-aspect-ratio));
+  height: calc(
+    200px / var(--pgn-board-aspect-ratio) / var(--square-aspect-ratio, 1)
+  );
 }
 
 #pgndiv .pgn-board-pocket-top,
@@ -1701,13 +1719,13 @@ button.inioption {
 }
 
 #pgndiv .pgn-board-board {
-  background-repeat: no-repeat;
   background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
-#pgndiv .pgn-board-pocket-top > *,
-#pgndiv .pgn-board-board > *,
-#pgndiv .pgn-board-pocket-bottom > * {
+#pgndiv .board-square,
+#pgndiv .pocket-square {
   position: absolute;
 }
 
@@ -1719,6 +1737,7 @@ button.inioption {
   bottom: 0;
   background-repeat: no-repeat;
   background-size: cover;
+  background-position: center;
 }
 
 #pgndiv .last-move-square {
@@ -1749,10 +1768,17 @@ button.inioption {
   position: absolute;
   right: 0;
   bottom: 0;
-  width: 25%;
-  height: 25%;
-  color: var(--accent-ink);
-  background-color: var(--bad);
+  top: 66%;
+  left: 66%;
+  color: #fff;
+  background: #d85000;
+  font-size: 40%;
+  font-weight: bold;
+  font-family: "Courier New", Courier, monospace;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: nowrap;
 }
 
 #pgndiv .needs-attention-sign {

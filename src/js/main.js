@@ -20,6 +20,7 @@ if (typeof window.FairyStockfish == "undefined") {
   throw Error("Cannot load fairy stockfish!");
 }
 const FairyStockfish = window.FairyStockfish;
+window.m = m;
 
 // Constants and variables previously in main.js
 
@@ -1008,6 +1009,15 @@ class GameTree {
     const board_width = dimensions.width;
     const board_height = dimensions.height;
     const has_pocket = this.OriginalFEN.includes("[");
+    const wrap = document.getElementById("chessground-board");
+    const cg_board = wrap ? wrap.getElementsByTagName("cg-board")[0] : null;
+    const square_aspect_ratio = cg_board
+      ? parseFloat(
+          window
+            .getComputedStyle(cg_board)
+            .getPropertyValue("--square-aspect-ratio"),
+        ) || 1
+      : 1;
 
     const VNODE_SPLITTER_START = 0;
     const VNODE_SPLITTER_END = 1;
@@ -1299,12 +1309,13 @@ class GameTree {
                 {
                   title:
                     "Preview of the position. Click to go to this position.",
+                  style: `--square-aspect-ratio: ${square_aspect_ratio};`,
                   onclick: previous_onclick_handler,
                 },
                 [
                   boardpeek.GenerateBoardDisplayElement(
                     info_struct.fenstr.split(" ")[0],
-                    info_struct.lastmove.join(""),
+                    move ? move[0] + move[1] : "",
                     info_struct.checked,
                     has_pocket,
                     Orientation,
@@ -1488,7 +1499,118 @@ class GameTree {
       }
       if (current_move_element.move_number) {
         current_list.push(generate_move_element(current_move_element, true));
-        current_move_element = new_move_grid();
+      }
+      return m("div#pgndiv.board-display-san", current_list);
+    } else if (Mode == "tree-grid-half" || Mode == "grid-half") {
+      const RECURSE = Mode == "tree-grid-half";
+      function generate_move_element(move_element) {
+        return m("div.move-grid", [
+          move_element.move_number,
+          m("div.half-move-column", move_element.half_move_elements),
+        ]);
+      }
+      function new_move_grid() {
+        return {
+          move_number: null,
+          half_move_elements: [],
+        };
+      }
+      let stack = [];
+      let level = 0;
+      let current_list = [];
+      let current_move_element = new_move_grid();
+      let current_move_inline_elements = [];
+      let previous_list;
+      let element;
+      let current_half_move_number = this.MoveTree.InitialHalfMoveNumber;
+      let half_move_number_stack = [];
+      for (i = 0; i < pgn_container_vnodes.length; i++) {
+        if (vnode_types[i] == VNODE_MOVE_NUMBER) {
+          continue;
+        } else if (vnode_types[i] == VNODE_SPLITTER_START) {
+          half_move_number_stack.push(current_half_move_number--);
+          if (RECURSE || level == 0) {
+            if (current_move_element.move_number) {
+              current_list.push(generate_move_element(current_move_element));
+              current_move_element = new_move_grid();
+            }
+            stack.push(current_list);
+            current_list = [];
+          } else {
+            current_list.push(pgn_container_vnodes[i]);
+          }
+          level++;
+        } else if (vnode_types[i] == VNODE_SPLITTER_END) {
+          current_half_move_number = half_move_number_stack.pop();
+          if (RECURSE || level == 1) {
+            if (RECURSE && current_move_element.move_number) {
+              current_list.push(
+                generate_move_element(current_move_element, true),
+              );
+              current_move_element = new_move_grid();
+            }
+            previous_list = current_list;
+            element = stack.pop();
+            current_list = element;
+            current_list.push(m("div.branch", previous_list));
+          } else {
+            current_list.push(pgn_container_vnodes[i]);
+          }
+          level--;
+        } else {
+          if (RECURSE || level == 0) {
+            if (vnode_types[i] == VNODE_FIRST_MOVE) {
+              if (current_move_element.move_number) {
+                current_list.push(generate_move_element(current_move_element));
+                current_move_element = new_move_grid();
+              }
+              current_move_inline_elements =
+                current_move_element.half_move_elements;
+              current_move_element.move_number = m(
+                "p.move-number",
+                `${current_half_move_number++}.`,
+              );
+              current_move_element.half_move_elements.push(
+                pgn_container_vnodes[i],
+              );
+            } else if (vnode_types[i] == VNODE_SECOND_MOVE) {
+              if (current_move_element.move_number) {
+                current_list.push(generate_move_element(current_move_element));
+                current_move_element = new_move_grid();
+              }
+              current_move_inline_elements =
+                current_move_element.half_move_elements;
+              current_move_element.move_number = m(
+                "p.move-number",
+                `${current_half_move_number++}.`,
+              );
+              current_move_element.half_move_elements.push(
+                pgn_container_vnodes[i],
+              );
+            } else if (vnode_types[i] == VNODE_INLINE_OBJECT) {
+              current_move_inline_elements.push(pgn_container_vnodes[i]);
+            } else if (vnode_types[i] == VNODE_BLOCK_OBJECT) {
+              if (current_move_element.move_number) {
+                current_list.push(generate_move_element(current_move_element));
+                current_move_element = new_move_grid();
+              }
+              current_list.push(m("div.grid-block", [pgn_container_vnodes[i]]));
+            }
+          } else {
+            if (
+              vnode_types[i] == VNODE_FIRST_MOVE ||
+              vnode_types[i] == VNODE_SECOND_MOVE
+            ) {
+              current_list.push(
+                m("p.move-number", `${current_half_move_number++}.`),
+              );
+            }
+            current_list.push(pgn_container_vnodes[i]);
+          }
+        }
+      }
+      if (current_move_element.move_number) {
+        current_list.push(generate_move_element(current_move_element, true));
       }
       return m("div#pgndiv.board-display-san", current_list);
     } else {
@@ -3183,22 +3305,21 @@ function updateBoardSize(force) {
   wrap.style.width = "";
   wrap.style.height = "";
   wrap.style.maxWidth = "none";
-  const wrapstyle = window.getComputedStyle(wrap);
-  const naturalwidth = parseFloat(wrapstyle.width);
-  const naturalheight = parseFloat(wrapstyle.height);
   wrap.style.width = inlinewidth;
   wrap.style.height = inlineheight;
   wrap.style.maxWidth = "";
-  let aspect = ranks / files;
-  if (
-    naturalwidth > 0 &&
-    naturalheight > 0 &&
-    !(naturalwidth == 640 && naturalheight == 640)
-  ) {
-    aspect = naturalheight / naturalwidth;
-  }
-  const w0 = aspect > 1 ? maxdim / aspect : maxdim;
-  const h0 = aspect > 1 ? maxdim : maxdim * aspect;
+  const cg_board = wrap.getElementsByTagName("cg-board")[0];
+  // square_aspect_ratio = square_width / square_height
+  let square_aspect_ratio = cg_board
+    ? parseFloat(
+        window
+          .getComputedStyle(cg_board)
+          .getPropertyValue("--square-aspect-ratio"),
+      ) || 1
+    : 1;
+  let aspect = (files / ranks) * square_aspect_ratio;
+  const w0 = aspect < 1 ? maxdim * aspect : maxdim;
+  const h0 = aspect < 1 ? maxdim : maxdim / aspect;
   const columnstyle = window.getComputedStyle(column);
   const avail =
     column.clientWidth -
@@ -4389,22 +4510,22 @@ const App = () => {
         args += limitargs;
       }
       if (!($("#whitedepth").validity.valid && whitedepthv > 0)) {
-        whitedepth = -1;
+        whitedepthv = -1;
       }
       if (!($("#whitemovetime").validity.valid && whitemovetimev > 0)) {
-        whitemovetime = -1;
+        whitemovetimev = -1;
       }
       if (!($("#whitenodes").validity.valid && whitenodesv > 0)) {
-        whitenodes = -1;
+        whitenodesv = -1;
       }
       if (!($("#blackdepth").validity.valid && blackdepthv > 0)) {
-        blackdepth = -1;
+        blackdepthv = -1;
       }
       if (!($("#blackmovetime").validity.valid && blackmovetimev > 0)) {
-        blackmovetime = -1;
+        blackmovetimev = -1;
       }
       if (!($("#blacknodes").validity.valid && blacknodesv > 0)) {
-        blacknodes = -1;
+        blacknodesv = -1;
       }
     }
 
@@ -6819,6 +6940,8 @@ const App = () => {
     dice: "m 7,4.5 a 3,3 0 0 0 -3,3 v 10 a 3,3 0 0 0 3,3 h 10 a 3,3 0 0 0 3,-3 v -10 a 3,3 0 0 0 -3,-3 z M 8,10 a 1.5,1.5 0 1 1 0,-3 1.5,1.5 0 0 1 0,3 m 8,0 a 1.5,1.5 0 1 1 0,-3 1.5,1.5 0 0 1 0,3 m 1.5,6.5 a 1.5,1.5 0 1 1 -3,0 1.5,1.5 0 0 1 3,0 M 8,18 a 1.5,1.5 0 1 1 0,-3 1.5,1.5 0 0 1 0,3",
     diamond:
       "m 10.95097,4.435 c 0.58,-0.58 1.52,-0.58 2.1,0 l 6.515,6.516 c 0.58,0.58 0.58,1.519 0,2.098 l -6.515,6.516 c -0.58,0.58 -1.519,0.58 -2.098,0 L 4.4359698,13.05 a 1.48,1.48 0 0 1 0,-2.098 z",
+    border:
+      "M 4,4 H 20 V 20 H 4 Z m 1,1 v 6.5 h 6.5 V 5 Z m 7.5,0 v 6.5 H 19 V 5 Z M 19,12.5 H 12.5 V 19 H 19 Z M 11.5,19 V 12.5 H 5 V 19 Z",
   };
 
   const icon = (name, size) => {
@@ -7873,16 +7996,26 @@ const App = () => {
         {
           onwheel: (event) => {
             if (event instanceof WheelEvent) {
-              event.stopPropagation();
-              event.preventDefault();
               if (!game_started) {
-                requestAnimationFrame(() => {
-                  if (event.deltaY < 0) {
-                    document.getElementById("previousposition").click();
-                  } else {
-                    document.getElementById("nextposition").click();
-                  }
-                });
+                event.stopPropagation();
+                event.preventDefault();
+                if (event.ctrlKey) {
+                  requestAnimationFrame(() => {
+                    if (event.deltaY < 0) {
+                      document.getElementById("initialposition").click();
+                    } else {
+                      document.getElementById("finalposition").click();
+                    }
+                  });
+                } else {
+                  requestAnimationFrame(() => {
+                    if (event.deltaY < 0) {
+                      document.getElementById("previousposition").click();
+                    } else {
+                      document.getElementById("nextposition").click();
+                    }
+                  });
+                }
               }
             }
           },
@@ -8560,6 +8693,15 @@ const App = () => {
                       "Set Termination\nClick to set result and termination on current move.",
                   },
                   icon("flag", 16),
+                ),
+                m(
+                  "button#movetree-boardpreview",
+                  {
+                    type: "button",
+                    title:
+                      "Toggle Board Preview\nClick to show or hide the board of current move in the list.",
+                  },
+                  icon("border", 16),
                 ),
                 m(
                   "button#movetree-headers",
@@ -11977,6 +12119,15 @@ const App = () => {
                   m(
                     "option",
                     {
+                      value: "grid-half",
+                      title:
+                        "Variation moves are put into identation blocks, and brackets are removed. Half move per line, and move numbers are half move numbers. Lishogi.org style.",
+                    },
+                    "Grid (Half moves)",
+                  ),
+                  m(
+                    "option",
+                    {
                       value: "tree-flat",
                       title:
                         "Variation moves are put into identation blocks, and brackets are removed. ChessBase.com style.",
@@ -11991,6 +12142,15 @@ const App = () => {
                         "Variation moves are also in grid layouts, and are put into identation blocks. Brackets are removed.",
                     },
                     "Grid (Tree)",
+                  ),
+                  m(
+                    "option",
+                    {
+                      value: "tree-grid-half",
+                      title:
+                        "Variation moves are also in grid layouts, and are put into identation blocks. Brackets are removed. Half move per line, and move numbers are half move numbers.",
+                    },
+                    "Grid (Half moves, Tree)",
                   ),
                 ],
               ),
@@ -13103,6 +13263,9 @@ const buttonMoveTreeTermination = document.getElementById(
 const buttonMoveTreeUndo = document.getElementById("movetree-undo");
 const buttonMoveTreeRedo = document.getElementById("movetree-redo");
 const buttonMoveTreeHeaders = document.getElementById("movetree-headers");
+const buttonMoveTreeBoardPreview = document.getElementById(
+  "movetree-boardpreview",
+);
 const buttonMoveTreeSave = document.getElementById("movetree-save");
 const buttonMoveTreeSaveImage = document.getElementById("movetree-imagesave");
 const buttonMoveTreeResize = document.getElementById("movetree-resize");
@@ -13477,6 +13640,47 @@ document.addEventListener("gameend", (event) => {
   }
 });
 
+// Spacebar to play current best engine move (analysis mode)
+document.addEventListener("keydown", function (ev) {
+  const tag =
+    ev.target && ev.target.tagName ? ev.target.tagName.toLowerCase() : "";
+  const isEditable =
+    tag === "input" ||
+    tag === "textarea" ||
+    (ev.target && ev.target.isContentEditable === true);
+  if (isEditable) return;
+  if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
+  if (ev.repeat) return;
+
+  if (
+    (ev.code === "Space" || ev.key === " ") &&
+    isAnalysis &&
+    isAnalysis.checked
+  ) {
+    ev.preventDefault();
+    if (gatingPending) return;
+    if (spacebarDebounce) return;
+
+    // Require a fresh PV for the current position
+    const currentSig = `${textFen.value.trim()}|${textMoves.value.trim()}|${getColor(board)}`;
+    if (
+      !lastPVBestMove ||
+      lastPVBestMove === "0000" ||
+      lastPVPosSig !== currentSig ||
+      Date.now() - lastPVTime > 4000
+    ) {
+      return;
+    }
+
+    spacebarDebounce = true;
+    textMoves.value = (textMoves.value + " " + lastPVBestMove).trim();
+    pSetFen.click();
+    setTimeout(function () {
+      spacebarDebounce = false;
+    }, 300);
+  }
+});
+
 for (i = 0; i < maxmultipvcount; i++) {
   //multipvrecord: Array<Struct<IsMate:boolean, EvaluationNumber:number, BestMove:string, PonderMove:string, PrincipalVariationUCIMove:string, Depth:number, SelectiveDepth:number>>
   multipvrecord.push([null, null, null, null, null, null, null]);
@@ -13780,47 +13984,6 @@ function initBoard(variant) {
     opacity: 1,
     lineWidth: 10,
   };
-
-  // Spacebar to play current best engine move (analysis mode)
-  document.addEventListener("keydown", function (ev) {
-    const tag =
-      ev.target && ev.target.tagName ? ev.target.tagName.toLowerCase() : "";
-    const isEditable =
-      tag === "input" ||
-      tag === "textarea" ||
-      (ev.target && ev.target.isContentEditable === true);
-    if (isEditable) return;
-    if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
-    if (ev.repeat) return;
-
-    if (
-      (ev.code === "Space" || ev.key === " ") &&
-      isAnalysis &&
-      isAnalysis.checked
-    ) {
-      ev.preventDefault();
-      if (gatingPending) return;
-      if (spacebarDebounce) return;
-
-      // Require a fresh PV for the current position
-      const currentSig = `${textFen.value.trim()}|${textMoves.value.trim()}|${getColor(board)}`;
-      if (
-        !lastPVBestMove ||
-        lastPVBestMove === "0000" ||
-        lastPVPosSig !== currentSig ||
-        Date.now() - lastPVTime > 4000
-      ) {
-        return;
-      }
-
-      spacebarDebounce = true;
-      textMoves.value = (textMoves.value + " " + lastPVBestMove).trim();
-      pSetFen.click();
-      setTimeout(function () {
-        spacebarDebounce = false;
-      }, 300);
-    }
-  });
 
   if (pocketRoles === undefined) {
     pocketTopEl.classList.add("no-inital-pocket-piece");
@@ -16163,6 +16326,19 @@ new Module().then((loadedModule) => {
     }
   };
 
+  buttonMoveTreeBoardPreview.onclick = function () {
+    if (!buttonMoveTreeBoardPreview.disabled) {
+      let text_after = gametree.CurrentMove.Move.TextAfter;
+      if (text_after.includes("[#]")) {
+        text_after = text_after.replace(/\[#\]/g, "");
+      } else {
+        text_after += "[#]";
+      }
+      gametree.SetTextAfterOfCurrentMove(text_after);
+      updatePGNDivision(false);
+    }
+  };
+
   rangeVolume.oninput = function () {
     soundMove.volume = rangeVolume.value;
     soundCapture.volume = rangeVolume.value;
@@ -18419,6 +18595,7 @@ function getPgnDiv(board) {
       buttonMoveTreeClearComments.disabled =
       buttonMoveTreeMarkers.disabled =
       buttonMoveTreeTermination.disabled =
+      buttonMoveTreeBoardPreview.disabled =
         true;
     return m("div", getPgn(board) ?? "");
   } else {
@@ -18454,6 +18631,7 @@ function getPgnDiv(board) {
       buttonMoveTreeMarkers.disabled =
       buttonMoveTreeTextAfter.disabled =
       buttonMoveTreeTermination.disabled =
+      buttonMoveTreeBoardPreview.disabled =
         false;
     return gametree.ToPGNDiv(
       ffishnotationobjects[notationindex],

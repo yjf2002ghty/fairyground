@@ -1,3 +1,8 @@
+/* Aspect ratio = width / height */
+.torishogiboard.board7x7 cg-board {
+  --square-aspect-ratio: 0.8666666;
+}
+
 .torishogiboard.board7x7 cg-board::before {
   background-image: url("images/board/torishogi/torishogiboard.svg");
   width: 100%;
@@ -17,8 +22,4 @@
   height: calc(630px * 0.5);
   position: relative;
   display: block;
-}
-
-.torishogiboard.board7x7 .cg-wrap piece {
-  position: absolute;
 }
