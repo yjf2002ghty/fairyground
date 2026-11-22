@@ -211,7 +211,7 @@ const FriendlyGameTerminationNames = [
   "Rules infraction",
   "Player run out of time",
   "Ongoing, not terminated",
-  "Not Specified",
+  "Reason not specified",
   "Ended by game rule",
 ];
 
@@ -7996,7 +7996,7 @@ const App = () => {
         {
           onwheel: (event) => {
             if (event instanceof WheelEvent) {
-              if (!game_started) {
+              if (!game_started && !board_setup_mode) {
                 event.stopPropagation();
                 event.preventDefault();
                 if (event.ctrlKey) {
@@ -8219,7 +8219,7 @@ const App = () => {
         m(
           "p.hint",
           { hidden: !(app_mode == "play" && engine_match_mode) },
-          `Engine match: ${engine_match_played_game_count} / ${engine_match_total_game_count} games played · White ${engine_match_white_wins} · Black ${engine_match_black_wins} · Draws ${engine_match_draws}`,
+          `Engine match: ${engine_match_played_game_count} / ${engine_match_total_game_count} games played · ${playerColor(mover_color_scheme, "white")} ${engine_match_white_wins} · ${playerColor(mover_color_scheme, "black")} ${engine_match_black_wins} · Draws ${engine_match_draws}`,
         ),
         m(
           "p#reviewmodenote1",
@@ -12977,7 +12977,11 @@ const App = () => {
             m("option", { value: "rules infraction" }, "Rules infraction"),
             m("option", { value: "time forfeit" }, "Player run out of time"),
             m("option", { value: "unterminated" }, "Ongoing, not terminated"),
-            m("option", { value: "unknown", hidden: true }, "Not Specified"),
+            m(
+              "option",
+              { value: "unknown", hidden: true },
+              "Reason not specified",
+            ),
             m(
               "option",
               { value: "normal", hidden: true },
