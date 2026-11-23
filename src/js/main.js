@@ -11,6 +11,7 @@ import * as themeutil from "./chessgroundtheme.js";
 import * as myvariants from "./myVariants.js";
 import * as evalhistory from "./evalhistory.js";
 import * as boardpeek from "./boardInMoveListPanel.js";
+import * as timing from "./timing.js";
 import * as fge from "./binaryEngine.js";
 import * as fgs from "./savedGames.js";
 
@@ -22,7 +23,9 @@ if (typeof window.FairyStockfish == "undefined") {
 const FairyStockfish = window.FairyStockfish;
 window.m = m;
 
+//
 // Constants and variables previously in main.js
+//
 
 const files = [
   "a",
@@ -249,8 +252,6 @@ var gatingPending = false;
 var gatingContext = null;
 // Open promotion/gating choice on the board, see showPromotionChoice()
 var promotionChoice = null;
-// Timer event correction after popup dialogs
-var timerElapsePreviousPlayer = false;
 // Spacebar best-move globals
 var lastPVPosSig = "";
 var lastPVBestMove = ""; // Also used by buttonAnalyzeRecommendedMove
@@ -1621,7 +1622,9 @@ class GameTree {
 
 let gametree = new GameTree();
 
+//
 // Contents previously <script> in index.html
+//
 
 let themes = [[], [], []];
 let themenames = [[], []];
@@ -3596,8 +3599,6 @@ const App = () => {
   let random_mover_white = false;
   let random_mover_black = false;
   let advanced_pgn_mode = true;
-  let white_start_time = 0;
-  let black_start_time = 0;
   let white_remaining_time = 0;
   let black_remaining_time = 0;
   let white_moving_time_list = [];
@@ -3613,14 +3614,19 @@ const App = () => {
   let black_byoyomi_period_count = 0;
   let white_remaining_byoyomi_periods = 0;
   let black_remaining_byoyomi_periods = 0;
+  let white_time_delay = 0;
+  let black_time_delay = 0;
   let white_time_margin = 0;
   let black_time_margin = 0;
   let timeout_margin = 500;
+  let white_engine_remaining_time = 0;
+  let black_engine_remaining_time = 0;
+  let white_engine_time_increment = 0;
+  let black_engine_time_increment = 0;
   let previous_mover = "";
   let white_time_exceeded = false;
   let black_time_exceeded = false;
   let previous_reality_time = -1;
-  let move_finish_timer_updating = false;
   let changing_variant_type = false;
   let clear_log = true;
   let game_list = [];
@@ -3635,6 +3641,8 @@ const App = () => {
   let engine_match_draws = 0;
   let engine_match_game_list = [];
   let timer;
+
+  let timing_system = new timing.TimingSystem([]);
 
   let websocket;
   let websocket_status = "Unestablished";
@@ -3655,10 +3663,13 @@ const App = () => {
 
   let show_evaluation_history_graph = false;
 
-  const default_start_time = 300000;
-  const default_time_increment = 3000;
-  const default_byoyomi_periods = 3;
-  const default_byoyomi_period_length = 30000;
+  const default_start_time = timing.DEFAULT_TIMING_SETTINGS.initial_time;
+  const default_time_increment = timing.DEFAULT_TIMING_SETTINGS.increment;
+  const default_byoyomi_periods =
+    timing.DEFAULT_TIMING_SETTINGS.byoyomi_periods;
+  const default_byoyomi_period_length =
+    timing.DEFAULT_TIMING_SETTINGS.byoyomi_period_length;
+  const default_delay_time = timing.DEFAULT_TIMING_SETTINGS.delay_time;
   const default_timeout_margin = 0;
   const default_movetime = 500;
   const default_depth = 12;
@@ -3964,25 +3975,17 @@ const App = () => {
 
   const setFen = (interrupt_ponder, automatically_start_engine_thinking) => {
     stop(interrupt_ponder);
-    const fen = $("#fen").value.trim();
-    const moves = $("#move").value.trim();
-    const movelist = moves.split(" ");
-    let i = 0;
-    let count = 0;
-    for (i = 0; i < movelist.length; i++) {
-      if (movelist[i].length == 0) {
-        continue;
-      }
-      count++;
-    }
-    $("#gotomovenum").value = count;
+    const fen = document.getElementById("fen").value.trim();
+    const moves = document.getElementById("move").value.trim();
+    const movelist = moves.split(SpaceSplitterMatcher);
+    document.getElementById("gotomovenum").value = movelist.length;
 
     if (fen.length > 0) {
       stockfish.postMessage(`position fen ${fen} moves ${moves}`);
     } else {
       stockfish.postMessage(`position startpos moves ${moves}`);
     }
-    const stm = $("#label-stm").innerText;
+    const stm = document.getElementById("label-stm").innerText;
     if (websocket_status == "CONNECTED") {
       if (fge.state.analysis_engine instanceof fge.Engine) {
         fge.state.analysis_engine.SetPosition(
@@ -4020,7 +4023,7 @@ const App = () => {
               if (
                 fge.state.first_engine.PonderMove != "0000" &&
                 fge.state.first_engine.PonderMove !=
-                  $("#move").value.trim().split(" ").at(-1)
+                  movelist[movelist.length - 1].at(-1)
               ) {
                 fge.state.first_engine.SetPonderMiss();
                 fge.state.first_engine.SetPosition(
@@ -4090,7 +4093,7 @@ const App = () => {
               if (
                 fge.state.second_engine.PonderMove != "0000" &&
                 fge.state.second_engine.PonderMove !=
-                  $("#move").value.trim().split(" ").at(-1)
+                  movelist[movelist.length - 1].at(-1)
               ) {
                 fge.state.second_engine.SetPonderMiss();
                 fge.state.second_engine.SetPosition(
@@ -4363,13 +4366,13 @@ const App = () => {
   //   return listlength;
   // };
 
-  const reset = () => {
-    review_mode = false;
-    // if (board_setup_mode) {
-    //   board_setup_mode = false;
-    //   triggerBoardSetupPieceIdentifier(false);
-    // }
-  };
+  // const reset = () => {
+  //   review_mode = false;
+  //   // if (board_setup_mode) {
+  //   //   board_setup_mode = false;
+  //   //   triggerBoardSetupPieceIdentifier(false);
+  //   // }
+  // };
 
   // const undo = () => {
   //   if (board_setup_mode) {
@@ -4389,8 +4392,6 @@ const App = () => {
     console.log(`return early: ${return_early}`);
     if (return_early) return; // avoid race condition
     let args = "";
-    let wargs = "";
-    let bargs = "";
     const movetime = $("#movetime").value;
     const depth = $("#depth").value;
     const nodes = $("#nodes").value;
@@ -4410,10 +4411,10 @@ const App = () => {
     let blacknodesv = parseInt($("#blacknodes").value);
     let winf = false;
     let binf = false;
-    let wtime = 0;
-    let btime = 0;
-    let winc = 0;
-    let binc = 0;
+    let wtime = white_engine_remaining_time;
+    let btime = black_engine_remaining_time;
+    let winc = white_engine_time_increment;
+    let binc = black_engine_time_increment;
     if (analysis_mode) {
       let analysisargs = "";
       if ($("#depth").validity.valid && depth > 0) {
@@ -4427,67 +4428,6 @@ const App = () => {
       }
       args += analysisargs != "" ? analysisargs : " infinite";
     } else if (advanced_time_control) {
-      if (
-        white_timer_type == "infinite" &&
-        $("#label-stm").innerHTML == "white"
-      ) {
-        args += "infinite";
-        wargs += "infinite";
-        winf = true;
-        console.log("wtime infinite");
-      } else if (
-        black_timer_type == "infinite" &&
-        $("#label-stm").innerHTML == "black"
-      ) {
-        args += "infinite";
-        bargs += "infinite";
-        binf = true;
-        console.log("btime infinite");
-      }
-      if (white_timer_type == "time per move") {
-        wtime += +white_moving_time_list[0].remaining_time;
-        winc += +white_moving_time_list[0].remaining_time;
-      } else if (white_timer_type == "tournament") {
-        wtime += +(+white_remaining_time);
-        winc += +white_time_gain;
-      } else if (white_timer_type == "hourglass") {
-        //How to tell that it's hourglass to engine?
-        wtime += +white_remaining_time;
-      } else if (white_timer_type == "byoyomi") {
-        wtime += +white_remaining_time;
-        if (
-          white_remaining_time < white_byoyomi_time_per_period &&
-          white_remaining_byoyomi_periods > 0
-        ) {
-          winc += +white_byoyomi_time_per_period;
-        }
-        if (white_remaining_byoyomi_periods == white_byoyomi_period_count) {
-          wtime += +white_byoyomi_time_per_period;
-          winc = 0;
-        }
-      }
-      if (black_timer_type == "time per move") {
-        btime += +black_moving_time_list[0].remaining_time;
-        binc += +black_moving_time_list[0].remaining_time;
-      } else if (black_timer_type == "tournament") {
-        btime += +(+black_remaining_time);
-        binc = +black_time_gain;
-      } else if (black_timer_type == "hourglass") {
-        //How to tell that it's hourglass to engine?
-        btime += +black_remaining_time;
-      } else if (black_timer_type == "byoyomi") {
-        btime += +black_remaining_time;
-        if (
-          black_remaining_time < black_byoyomi_time_per_period &&
-          black_remaining_byoyomi_periods > 0
-        ) {
-          binc += +black_byoyomi_time_per_period;
-        }
-        if (black_remaining_byoyomi_periods == black_byoyomi_period_count) {
-          btime += +black_byoyomi_time_per_period;
-          binc = 0;
-        }
-      }
       console.log(`wtime ${wtime} winc ${winc} btime ${btime} binc ${binc}`);
       args += `wtime ${wtime} winc ${winc} btime ${btime} binc ${binc}`;
       stockfish.postMessage(
@@ -4602,7 +4542,7 @@ const App = () => {
               winc,
               btime,
               binc,
-              white_byoyomi_time_per_period,
+              0,
             );
           } else {
             if (clear_log) {
@@ -4631,7 +4571,8 @@ const App = () => {
                 true,
                 false,
                 true,
-                white_timer_type == "byoyomi",
+                // white_timer_type == "byoyomi",
+                false,
                 whitedepthv,
                 whitemovetimev,
                 whitenodesv,
@@ -4658,7 +4599,8 @@ const App = () => {
                 advanced_time_control,
                 false,
                 false,
-                white_timer_type == "byoyomi",
+                // white_timer_type == "byoyomi",
+                false,
                 whitedepthv,
                 whitemovetimev,
                 whitenodesv,
@@ -4699,7 +4641,8 @@ const App = () => {
                 true,
                 true,
                 false,
-                black_timer_type == "byoyomi",
+                // black_timer_type == "byoyomi",
+                false,
                 blackdepthv,
                 blackmovetimev,
                 blacknodesv,
@@ -4727,7 +4670,8 @@ const App = () => {
                 true,
                 false,
                 true,
-                black_timer_type == "byoyomi",
+                // black_timer_type == "byoyomi",
+                false,
                 blackdepthv,
                 blackmovetimev,
                 blacknodesv,
@@ -4754,7 +4698,8 @@ const App = () => {
                 advanced_time_control,
                 false,
                 false,
-                black_timer_type == "byoyomi",
+                // black_timer_type == "byoyomi",
+                false,
                 blackdepthv,
                 blackmovetimev,
                 blacknodesv,
@@ -4795,7 +4740,8 @@ const App = () => {
                 true,
                 true,
                 false,
-                white_timer_type == "byoyomi",
+                // white_timer_type == "byoyomi",
+                false,
                 whitedepthv,
                 whitemovetimev,
                 whitenodesv,
@@ -4817,121 +4763,100 @@ const App = () => {
     }
   };
 
+  const timerOnUpdate = (
+    ThisArg,
+    MoverRound,
+    RemainingTime,
+    FormattedRemainingTime,
+    IsInTimoutMargin,
+  ) => {
+    const whitetimelabel = document.getElementById("whitetime");
+    const blacktimelabel = document.getElementById("blacktime");
+    if (MoverRound == 0) {
+      whitetimelabel.textContent = FormattedRemainingTime;
+      if (IsInTimoutMargin) {
+        whitetimelabel.classList.add("time-exceeded");
+      }
+    } else {
+      blacktimelabel.textContent = FormattedRemainingTime;
+      if (IsInTimoutMargin) {
+        blacktimelabel.classList.add("time-exceeded");
+      }
+    }
+    console.log(MoverRound);
+  };
+
+  const timerOnTimeout = (ThisArg, MoverRound) => {
+    const whitetimelabel = document.getElementById("whitetime");
+    const blacktimelabel = document.getElementById("blacktime");
+    if (MoverRound == 0) {
+      timeIsUpFor("WHITE");
+    } else {
+      timeIsUpFor("BLACK");
+    }
+    whitetimelabel.classList.remove("time-exceeded");
+    blacktimelabel.classList.remove("time-exceeded");
+  };
+
   const setupTimer = () => {
-    $("#timeoutside").value = 0;
-    white_timer_type = $("#dropdown-whitetimemode").value;
-    black_timer_type = $("#dropdown-blacktimemode").value;
-    white_remaining_time = parseInt($("#whitestarttime").value);
-    black_remaining_time = parseInt($("#blackstarttime").value);
-    if (
-      isNaN(white_remaining_time) ||
-      white_remaining_time.length < 1 ||
-      white_remaining_time < 1
-    ) {
-      white_remaining_time = play_white ? 20000 : 600000;
+    const stm = document.getElementById("label-stm").innerText;
+    let white_timing_logic = timing.CreateTimingLogic({
+      type: white_timer_type,
+      initial_time: parseInt(document.getElementById("whitestarttime").value),
+      increment: parseInt(document.getElementById("whitetimegain").value),
+      byoyomi_periods: parseInt(
+        document.getElementById("whitebyoyomiperiodcount").value,
+      ),
+      byoyomi_period_length: parseInt(
+        document.getElementById("whitebyoyomitime").value,
+      ),
+      delay_time: parseInt(document.getElementById("whitedelaytime").value),
+      timeout_margin: parseInt(
+        document.getElementById("whitetimemargin").value,
+      ),
+    });
+    let black_timing_logic = timing.CreateTimingLogic({
+      type: black_timer_type,
+      initial_time: parseInt(document.getElementById("blackstarttime").value),
+      increment: parseInt(document.getElementById("blacktimegain").value),
+      byoyomi_periods: parseInt(
+        document.getElementById("blackbyoyomiperiodcount").value,
+      ),
+      byoyomi_period_length: parseInt(
+        document.getElementById("blackbyoyomitime").value,
+      ),
+      delay_time: parseInt(document.getElementById("blackdelaytime").value),
+      timeout_margin: parseInt(
+        document.getElementById("blacktimemargin").value,
+      ),
+    });
+    if (timing_system) {
+      timing_system.destructor();
     }
-    if (
-      isNaN(black_remaining_time) ||
-      black_remaining_time.length < 1 ||
-      black_remaining_time < 1
-    ) {
-      black_remaining_time = play_black ? 20000 : 600000;
-    }
-    white_time_gain = parseInt($("#whitetimegain").value);
-    black_time_gain = parseInt($("#blacktimegain").value);
-    if (
-      isNaN(white_time_gain) ||
-      white_time_gain.length < 1 ||
-      white_time_gain < 0
-    ) {
-      white_time_gain = 0;
-    }
-    if (
-      isNaN(black_time_gain) ||
-      black_time_gain.length < 1 ||
-      black_time_gain < 0
-    ) {
-      black_time_gain = 0;
-    }
-    white_byoyomi_time_per_period = parseInt($("#whitebyoyomitime").value);
-    black_byoyomi_time_per_period = parseInt($("#blackbyoyomitime").value);
-    if (
-      isNaN(white_byoyomi_time_per_period) ||
-      white_byoyomi_time_per_period.length < 1 ||
-      white_byoyomi_time_per_period < 1
-    ) {
-      white_byoyomi_time_per_period = 30000;
-    }
-    if (
-      isNaN(black_byoyomi_time_per_period) ||
-      black_byoyomi_time_per_period.length < 1 ||
-      black_byoyomi_time_per_period < 1
-    ) {
-      black_byoyomi_time_per_period = 30000;
-    }
-    white_byoyomi_period_count = parseInt($("#whitebyoyomiperiodcount").value);
-    black_byoyomi_period_count = parseInt($("#blackbyoyomiperiodcount").value);
-    if (
-      isNaN(white_byoyomi_period_count) ||
-      white_byoyomi_period_count.length < 1 ||
-      white_byoyomi_period_count < 1
-    ) {
-      white_byoyomi_period_count = 1;
-    }
-    if (
-      isNaN(black_byoyomi_period_count) ||
-      black_byoyomi_period_count.length < 1 ||
-      black_byoyomi_period_count < 1
-    ) {
-      black_byoyomi_period_count = 1;
-    }
-    white_remaining_byoyomi_periods = white_byoyomi_period_count;
-    black_remaining_byoyomi_periods = black_byoyomi_period_count;
-    white_time_margin = parseInt($("#whitetimemargin").value);
-    black_time_margin = parseInt($("#blacktimemargin").value);
-    if (
-      isNaN(white_time_margin) ||
-      white_time_margin.length < 1 ||
-      white_time_margin < 0
-    ) {
-      white_time_margin = timeout_margin;
-    }
-    if (
-      isNaN(black_time_margin) ||
-      black_time_margin.length < 1 ||
-      black_time_margin < 0
-    ) {
-      black_time_margin = timeout_margin;
-    }
-    white_moving_time_list = [];
-    black_moving_time_list = [];
-    const now = Date.now();
-    white_moving_time_list.push({
-      remaining_time: white_remaining_time,
-      time_stamp: now,
-    }); //Start time white
-    black_moving_time_list.push({
-      remaining_time: black_remaining_time,
-      time_stamp: now,
-    }); //Start time black
-    $("#whitetime").innerHTML = `${parseInt(white_remaining_time / 1000)}`;
-    $("#blacktime").innerHTML = `${parseInt(black_remaining_time / 1000)}`;
-    if (white_timer_type == "infinite") {
-      $("#whitetime").innerHTML = "∞";
-    }
-    if (black_timer_type == "infinite") {
-      $("#blacktime").innerHTML = "∞";
-    }
-    previous_mover = "";
+    timing_system = new timing.TimingSystem([
+      white_timing_logic,
+      black_timing_logic,
+    ]);
+    timing_system.SetCurrentRound(stm == "black" ? 1 : 0);
+    timing_system.SetOnTimeElapsedCallback(timerOnUpdate);
+    timing_system.SetOnOutOfTimeCallback(timerOnTimeout);
+    white_timer_type = white_timing_logic.Name;
+    black_timer_type = black_timing_logic.Name;
+    white_engine_remaining_time = white_timing_logic.TimeLeft();
+    white_engine_time_increment = white_timing_logic.TimeIncrement();
+    black_engine_remaining_time = black_timing_logic.TimeLeft();
+    black_engine_time_increment = black_timing_logic.TimeIncrement();
+    document.getElementById("whitetime").textContent =
+      timing_system.TimingLogics[0].FormattedRemainingTime();
+    document.getElementById("blacktime").textContent =
+      timing_system.TimingLogics[1].FormattedRemainingTime();
   };
 
   const resetTimer = () => {
-    $("#whitetime").innerHTML = "--";
-    $("#blacktime").innerHTML = "--";
-    previous_mover = "";
+    timing_system.StopTiming();
+    document.getElementById("whitetime").textContent = "--";
+    document.getElementById("blacktime").textContent = "--";
     $("#timeoutside").value = 0;
-    white_time_exceeded = false;
-    black_time_exceeded = false;
     document.getElementById("whitetimer").classList.remove("timer-active");
     document.getElementById("blacktimer").classList.remove("timer-active");
     document.getElementById("whitetime").classList.remove("time-exceeded");
@@ -4942,280 +4867,51 @@ const App = () => {
     if (!during_play) {
       return;
     }
-    move_finish_timer_updating = true;
     const stm = document.getElementById("label-stm").innerText;
+    const mover_round = stm == "white" ? 0 : 1;
     console.log(`${$("#gamestatus").innerText}`);
-    //console.log(white_moving_time_list);
-    //console.log(white_moving_time_list);
-    const realtimenow = Date.now();
+    if (mover_round != timing_system.CurrentRound) {
+      timing_system.NextRound();
+    }
+    white_engine_remaining_time = timing_system.TimingLogics[0].TimeLeft();
+    white_engine_time_increment = timing_system.TimingLogics[0].TimeIncrement();
+    black_engine_remaining_time = timing_system.TimingLogics[1].TimeLeft();
+    black_engine_time_increment = timing_system.TimingLogics[1].TimeIncrement();
+
     if (stm == "white") {
-      if (previous_mover == "") {
-        if (white_timer_type == "tournament") {
-          white_remaining_time =
-            +white_remaining_time + +white_time_gain + +timer_interval;
-        }
-        white_moving_time_list.push({
-          remaining_time: white_remaining_time,
-          time_stamp: realtimenow,
-        }); //Time stamp for white's turn begin
-      } else {
-        black_moving_time_list.push({
-          remaining_time: black_remaining_time < 0 ? 0 : black_remaining_time,
-          time_stamp: realtimenow,
-        }); //Time stamp for black's turn end
-        if (white_remaining_time < 0) {
-          white_remaining_time = 0;
-        }
-        //white_remaining_time = (+white_moving_time_list.at(-1).remaining_time) + ((+white_moving_time_list.at(-1).time_stamp) - (+now));
-        if (white_timer_type == "tournament") {
-          white_remaining_time =
-            +white_remaining_time + +white_time_gain + +timer_interval;
-        } else if (white_timer_type == "time per move") {
-          white_remaining_time =
-            +white_moving_time_list[0].remaining_time + +timer_interval;
-        } else if (white_timer_type == "byoyomi") {
-          if (white_remaining_byoyomi_periods < white_byoyomi_period_count) {
-            white_remaining_time =
-              +white_byoyomi_time_per_period + +timer_interval;
-          } else {
-            white_remaining_time = +white_remaining_time + +timer_interval;
-          }
-        }
-        if (black_timer_type == "hourglass") {
-          white_remaining_time =
-            +white_remaining_time +
-            +black_moving_time_list.at(-2).remaining_time -
-            +black_moving_time_list.at(-1).remaining_time;
-        }
-        white_moving_time_list.push({
-          remaining_time: white_remaining_time,
-          time_stamp: realtimenow,
-        }); //Time stamp for white's turn begin
-      }
-      previous_mover = "WHITE";
       document.getElementById("whitetimer").classList.add("timer-active");
       document.getElementById("blacktimer").classList.remove("timer-active");
     } else if (stm == "black") {
-      if (previous_mover == "") {
-        if (black_timer_type == "tournament") {
-          black_remaining_time =
-            +black_remaining_time + +black_time_gain + +timer_interval;
-        }
-        black_moving_time_list.push({
-          remaining_time: black_remaining_time,
-          time_stamp: realtimenow,
-        }); //Time stamp for black's turn begin
-      } else {
-        white_moving_time_list.push({
-          remaining_time: white_remaining_time < 0 ? 0 : white_remaining_time,
-          time_stamp: realtimenow,
-        }); //Time stamp for white's turn end
-        if (black_remaining_time < 0) {
-          black_remaining_time = 0;
-        }
-        //black_remaining_time = (+black_moving_time_list.at(-1).remaining_time) + ((+black_moving_time_list.at(-1).time_stamp) - (+now));
-        if (black_timer_type == "tournament") {
-          black_remaining_time =
-            +black_remaining_time + +black_time_gain + +timer_interval;
-        } else if (black_timer_type == "time per move") {
-          black_remaining_time =
-            +black_moving_time_list[0].remaining_time + +timer_interval;
-        } else if (black_timer_type == "byoyomi") {
-          if (black_remaining_byoyomi_periods < black_byoyomi_period_count) {
-            black_remaining_time =
-              +black_byoyomi_time_per_period + +timer_interval;
-          } else {
-            black_remaining_time = +black_remaining_time + +timer_interval;
-          }
-        }
-        if (white_timer_type == "hourglass") {
-          black_remaining_time =
-            +black_remaining_time +
-            +white_moving_time_list.at(-2).remaining_time -
-            +white_moving_time_list.at(-1).remaining_time;
-        }
-        black_moving_time_list.push({
-          remaining_time: black_remaining_time,
-          time_stamp: realtimenow,
-        }); //Time stamp for black's turn begin
-      }
-      previous_mover = "BLACK";
       document.getElementById("whitetimer").classList.remove("timer-active");
       document.getElementById("blacktimer").classList.add("timer-active");
     } else {
+      deleteTimer();
+      gameEnd();
       document.getElementById("whitetimer").classList.remove("timer-active");
       document.getElementById("blacktimer").classList.remove("timer-active");
     }
-    if (white_time_exceeded) {
-      document.getElementById("whitetime").classList.remove("time-exceeded");
-    }
-    if (black_time_exceeded) {
-      document.getElementById("blacktime").classList.remove("time-exceeded");
-    }
-    white_time_exceeded = false;
-    black_time_exceeded = false;
-    move_finish_timer_updating = false;
-  }
-
-  function updateTimer() {
-    const gamestatus = document.getElementById("gamestatus");
-    if (gamestatus.innerText == "END") {
-      deleteTimer();
-      gameEnd();
-      return;
-    }
-    if (move_finish_timer_updating) {
-      //avoid race condition
-      return;
-    }
-    let deltatimereality = 0;
-    let realitytimenow = Date.now();
-    if (previous_reality_time >= 0) {
-      deltatimereality = realitytimenow - previous_reality_time;
-    }
-    previous_reality_time = realitytimenow;
-    gamestatus.click();
-    const whitetimelabel = document.getElementById("whitetime");
-    const blacktimelabel = document.getElementById("blacktime");
-    if (gamestatus.innerText == "PLAYING_WHITE") {
-      if (white_timer_type == "infinite") {
-        previous_mover = "WHITE";
-        return;
-      }
-      white_remaining_time = white_remaining_time - deltatimereality;
-      if (white_timer_type == "byoyomi" && white_remaining_time <= 0) {
-        if (white_remaining_byoyomi_periods == 0) {
-        } else {
-          white_remaining_byoyomi_periods--;
-          white_remaining_time = +white_byoyomi_time_per_period;
-          console.log(
-            "WHITE byoyomi remaining periods: " +
-              white_remaining_byoyomi_periods,
-          );
-        }
-      }
-      if (white_remaining_time < -white_time_margin) {
-        deleteTimer();
-        $("#timeoutside").value = 1;
-        timeIsUpFor("WHITE");
-        whitetimelabel.classList.remove("time-exceeded");
-        return;
-      }
-      if (white_timer_type == "infinite") {
-        whitetimelabel.innerText = "∞";
-      } else if (white_remaining_time >= 10000) {
-        whitetimelabel.innerText = `${parseInt(white_remaining_time / 1000)}`;
-      } else {
-        whitetimelabel.innerText = `${(
-          parseInt(white_remaining_time / 100) / 10
-        ).toFixed(1)}`;
-        if (white_remaining_time <= 0 && !white_time_exceeded) {
-          white_time_exceeded = true;
-          whitetimelabel.classList.add("time-exceeded");
-        }
-      }
-      if (black_timer_type == "infinite") {
-        blacktimelabel.innerText = "∞";
-      } else if (black_remaining_time >= 10000) {
-        blacktimelabel.innerText = `${parseInt(black_remaining_time / 1000)}`;
-      } else {
-        blacktimelabel.innerText = `${(
-          parseInt(black_remaining_time / 100) / 10
-        ).toFixed(1)}`;
-        if (black_remaining_time <= 0 && !black_time_exceeded) {
-          black_time_exceeded = true;
-          blacktimelabel.classList.add("time-exceeded");
-        }
-      }
-      if (white_timer_type == "byoyomi") {
-        whitetimelabel.innerText += ` (${white_remaining_byoyomi_periods})`;
-      }
-      if (black_timer_type == "byoyomi") {
-        blacktimelabel.innerText += ` (${black_remaining_byoyomi_periods})`;
-      }
-      previous_mover = "WHITE";
-    } else if (gamestatus.innerText == "PLAYING_BLACK") {
-      if (black_timer_type == "infinite") {
-        previous_mover = "BLACK";
-        return;
-      }
-      black_remaining_time = black_remaining_time - deltatimereality;
-      if (black_timer_type == "byoyomi" && black_remaining_time <= 0) {
-        if (black_remaining_byoyomi_periods == 0) {
-        } else {
-          black_remaining_byoyomi_periods--;
-          black_remaining_time = +black_byoyomi_time_per_period;
-          console.log(
-            "BLACK byoyomi remaining periods: " +
-              black_remaining_byoyomi_periods,
-          );
-        }
-      }
-      if (black_remaining_time < -black_time_margin) {
-        deleteTimer();
-        $("#timeoutside").value = 2;
-        timeIsUpFor("BLACK");
-        blacktimelabel.classList.remove("time-exceeded");
-        return;
-      }
-      if (white_timer_type == "infinite") {
-        whitetimelabel.innerText = "∞";
-      } else if (white_remaining_time >= 10000) {
-        whitetimelabel.innerText = `${parseInt(white_remaining_time / 1000)}`;
-      } else {
-        whitetimelabel.innerText = `${(
-          parseInt(white_remaining_time / 100) / 10
-        ).toFixed(1)}`;
-        if (white_remaining_time <= 0 && !white_time_exceeded) {
-          white_time_exceeded = true;
-          whitetimelabel.classList.add("time-exceeded");
-        }
-      }
-      if (black_timer_type == "infinite") {
-        blacktimelabel.innerText = "∞";
-      } else if (black_remaining_time >= 10000) {
-        blacktimelabel.innerText = `${parseInt(black_remaining_time / 1000)}`;
-      } else {
-        blacktimelabel.innerText = `${(
-          parseInt(black_remaining_time / 100) / 10
-        ).toFixed(1)}`;
-        if (black_remaining_time <= 0 && !black_time_exceeded) {
-          black_time_exceeded = true;
-          blacktimelabel.classList.add("time-exceeded");
-        }
-      }
-      if (white_timer_type == "byoyomi") {
-        whitetimelabel.innerText += ` (${white_remaining_byoyomi_periods})`;
-      }
-      if (black_timer_type == "byoyomi") {
-        blacktimelabel.innerText += ` (${black_remaining_byoyomi_periods})`;
-      }
-      previous_mover = "BLACK";
-    }
+    document.getElementById("whitetime").classList.remove("time-exceeded");
+    document.getElementById("blacktime").classList.remove("time-exceeded");
   }
 
   const createTimer = () => {
-    timer = setInterval(() => {
-      updateTimer();
-    }, timer_interval);
-    console.log(`${timer}`);
+    timing_system.TimerInterval = timer_interval;
+    timing_system.StartTiming();
   };
 
   const deleteTimer = () => {
     console.log("Timer delete!");
-    clearInterval(timer);
+    timing_system.destructor();
   };
 
   const timeIsUpFor = (side) => {
     force_stop();
     if (side == "WHITE") {
-      white_remaining_time = 0;
       $("#timeoutside").value = 1;
-      $("#whitetime").innerHTML = "Out Of Time";
+      document.getElementById("whitetime").textContent = "Out Of Time";
     } else if (side == "BLACK") {
-      black_remaining_time = 0;
       $("#timeoutside").value = 2;
-      $("#blacktime").innerHTML = "Out Of Time";
+      document.getElementById("blacktime").textContent = "Out Of Time";
     }
     gameEnd();
     document.dispatchEvent(
@@ -5276,12 +4972,12 @@ const App = () => {
       fge.state.second_engine.PonderMiss = false;
     }
     createTimer();
-    const stm = $("#label-stm").innerText;
-    console.log(
-      `white: ${play_white} black: ${play_black} move: ${
-        (play_white && stm == "white") || (play_black && stm == "black")
-      }`,
-    );
+    // const stm = $("#label-stm").innerText;
+    // console.log(
+    //   `white: ${play_white} black: ${play_black} move: ${
+    //     (play_white && stm == "white") || (play_black && stm == "black")
+    //   }`,
+    // );
     console.log("Go!");
     previous_reality_time = -1;
     document.getElementById("set").click();
@@ -7004,6 +6700,7 @@ const App = () => {
   let integer_input_white_time_increment = "";
   let integer_input_white_byoyomi_periods = "";
   let integer_input_white_byoyomi_period_length = "";
+  let integer_input_white_delay_time = "";
   let integer_input_white_timeout_margin = "";
   let integer_input_white_depth = "";
   let integer_input_white_movetime = "";
@@ -7012,6 +6709,7 @@ const App = () => {
   let integer_input_black_time_increment = "";
   let integer_input_black_byoyomi_periods = "";
   let integer_input_black_byoyomi_period_length = "";
+  let integer_input_black_delay_time = "";
   let integer_input_black_timeout_margin = "";
   let integer_input_black_depth = "";
   let integer_input_black_movetime = "";
@@ -7057,12 +6755,16 @@ const App = () => {
     0, 1000, 2000, 3000, 5000, 10000, 15000, 20000, 30000, 60000,
   ];
   const byoyomiSteps = [5000, 10000, 15000, 20000, 30000, 45000, 60000];
+  const delaySteps = [
+    1000, 2000, 3000, 5000, 10000, 15000, 20000, 30000, 60000,
+  ];
   const marginSteps = [0, 100, 200, 500, 1000, 2000, 5000];
   const tc_white = {
     start: 5,
     gain: 3,
     byoyomi: 4,
     periods: 3,
+    delay: 2,
     margin: 0,
   };
   const tc_black = {
@@ -7070,6 +6772,7 @@ const App = () => {
     gain: 3,
     byoyomi: 4,
     periods: 3,
+    delay: 2,
     margin: 0,
   };
   const formatClock = (ms) => {
@@ -7113,7 +6816,7 @@ const App = () => {
               },
               "The time at the beginning of the game.",
             ),
-        m("div", { hidden: mode != "tournament" }, [
+        m("div", { hidden: mode != "tournament" && mode != "bronstein" }, [
           use_integer_inputs
             ? integerInput(
                 "Time Increment (ms)",
@@ -7198,6 +6901,35 @@ const App = () => {
                   tc.periods = value;
                 },
                 "Number of byo-yomi periods.",
+              ),
+        ]),
+        m("div", { hidden: mode != "simple delay" }, [
+          use_integer_inputs
+            ? integerInput(
+                "Delay time (ms)",
+                "1",
+                "",
+                default_delay_time,
+                (value) => {
+                  if (side == "white") {
+                    integer_input_white_delay_time = value;
+                  } else {
+                    integer_input_black_delay_time = value;
+                  }
+                },
+                "Length of delay time at the start of each turn in milliseconds.",
+                true,
+              )
+            : sliderRow(
+                "Delay time",
+                formatClock(delaySteps[tc.delay]),
+                0,
+                delaySteps.length - 1,
+                tc.delay,
+                (value) => {
+                  tc.delay = value;
+                },
+                "Length of delay time at the start of each turn.",
               ),
         ]),
         use_integer_inputs
@@ -7305,11 +7037,15 @@ const App = () => {
   // play mode. In analysis mode the engine never plays a side, but the
   // settings themselves are kept. Engine matches manage the players
   // on their own and are left alone.
-  const isClockModeValue = (mode) =>
-    mode == "tournament" ||
-    mode == "time per move" ||
-    mode == "hourglass" ||
-    mode == "byoyomi";
+  const clockModes = [
+    "tournament",
+    "time per move",
+    "hourglass",
+    "byoyomi",
+    "bronstein",
+    "simple delay",
+  ];
+  const isClockModeValue = (mode) => clockModes.includes(mode);
   const isEngineSide = (game) => game.player == "fsf" || game.player == "ext";
   const playerName = (game, fallback) => {
     if (app_mode != "play") {
@@ -7433,9 +7169,11 @@ const App = () => {
       ["black", game_black],
     ].forEach(([side, game]) => {
       const clock = isClockModeValue(game.mode);
-      const modedropdown = document.getElementById(`dropdown-${side}timemode`);
-      modedropdown.value = clock ? game.mode : "infinite";
-      modedropdown.dispatchEvent(new Event("change"));
+      if (side == "white") {
+        white_timer_type = clock ? game.mode : "infinite";
+      } else {
+        black_timer_type = clock ? game.mode : "infinite";
+      }
       let limit = null;
       if (!clock && isEngineSide(game)) {
         limit =
@@ -7563,6 +7301,8 @@ const App = () => {
     app_mode = "analysis";
     applyPlayerSettings();
     m.redraw();
+    document.getElementById("timeoutside").value = 0;
+    updateChessground(false);
   };
 
   const enterSetup = () => {
@@ -7982,12 +7722,12 @@ const App = () => {
           m("div#whitetimer", [
             m("p", "White Time"),
             m("p#whitetime", "--"),
-            m("p#whitetimetype", "infinite"),
+            m("p#whitetimetype", white_timer_type),
           ]),
           m("div#blacktimer", [
             m("p", "Black Time"),
             m("p#blacktime", "--"),
-            m("p#blacktimetype", "infinite"),
+            m("p#blacktimetype", black_timer_type),
           ]),
         ],
       ),
@@ -8064,7 +7804,7 @@ const App = () => {
               type: "button",
               title: "Add 10 seconds to the remaining time of first mover.",
               onclick: () => {
-                white_remaining_time = +white_remaining_time + 10000;
+                timing_system.AddTime(0, 10000);
               },
             },
             "+10 s white",
@@ -8075,7 +7815,7 @@ const App = () => {
               type: "button",
               title: "Add 10 seconds to the remaining time of second mover.",
               onclick: () => {
-                black_remaining_time = +black_remaining_time + 10000;
+                timing_system.AddTime(1, 10000);
               },
             },
             "+10 s black",
@@ -9802,7 +9542,6 @@ const App = () => {
                 type: "button",
                 disabled: !is_ready,
                 title: "Click to reset the position to default position.",
-                onclick: reset,
               },
               "Reset",
             ),
@@ -10675,8 +10414,7 @@ const App = () => {
     ]);
 
     // ---------------- new game dialog ----------------
-    const clockModes = ["tournament", "time per move", "hourglass", "byoyomi"];
-    const isClockMode = (mode) => clockModes.includes(mode);
+    const isClockMode = (mode) => isClockModeValue(mode);
     const isEnginePlayer = (player) => player == "fsf" || player == "ext";
     const externalAvailable = websocket_status == "CONNECTED";
     const sideSetup = (side, label, game, tc) => {
@@ -10698,44 +10436,20 @@ const App = () => {
               "Nodes per move",
               "This player needs to make each move within a fixed search node limit.",
             ],
-            [
-              "tournament",
-              "Tournament clock",
-              "This player has limited time and may get a time increment after a move.",
-            ],
-            [
-              "hourglass",
-              "Hourglass clock",
-              "This player has limited time and used time will be added to opponent's time.",
-            ],
-            [
-              "byoyomi",
-              "Byo-yomi clock",
-              "This player will enter the countdown (byoyomi) period(s) after their initial time runs out. During countdown periods, if the player make a move before the countdown period time runs out, the time will be reset to full time of countdown periods, otherwise the remaining period count will be decreased by 1 and the time will be reset to full time of countdown periods. If there's no countdown periods left and the remaining time runs out, this player runs out of time.",
-            ],
+            timing.GetTimerInformation("tournament", true),
+            timing.GetTimerInformation("hourglass", true),
+            timing.GetTimerInformation("byoyomi", true),
+            timing.GetTimerInformation("simple delay", true),
+            timing.GetTimerInformation("bronstein", true),
           ]
         : [
-            ["infinite", "No clock", "This player has infinite time."],
-            [
-              "tournament",
-              "Tournament",
-              "This player has limited time and may get a time increment after a move.",
-            ],
-            [
-              "time per move",
-              "Time per move",
-              "This player needs to make each move within a fixed time limit.",
-            ],
-            [
-              "hourglass",
-              "Hourglass",
-              "This player has limited time and used time will be added to opponent's time.",
-            ],
-            [
-              "byoyomi",
-              "Byo-yomi",
-              "This player will enter the countdown (byoyomi) period(s) after their initial time runs out. During countdown periods, if the player make a move before the countdown period time runs out, the time will be reset to full time of countdown periods, otherwise the remaining period count will be decreased by 1 and the time will be reset to full time of countdown periods. If there's no countdown periods left and the remaining time runs out, this player runs out of time.",
-            ],
+            timing.GetTimerInformation("infinite"),
+            timing.GetTimerInformation("tournament"),
+            timing.GetTimerInformation("time per move"),
+            timing.GetTimerInformation("hourglass"),
+            timing.GetTimerInformation("byoyomi"),
+            timing.GetTimerInformation("simple delay"),
+            timing.GetTimerInformation("bronstein"),
           ];
       const limitRow = m("div", [
         m("div", { hidden: game.mode != "depth" }, [
@@ -11041,67 +10755,6 @@ const App = () => {
           ]),
           m("div#advancedtimesettings", [
             m("div#whitetimesettings", [
-              m("p", "White"),
-              m(
-                "select#dropdown-whitetimemode",
-                {
-                  disabled: !is_ready || review_mode,
-                  title: "The time control mode for first mover (white).",
-                  onchange: () => {
-                    $("#whitetimetype").innerHTML = $(
-                      "#dropdown-whitetimemode",
-                    ).value;
-                    white_timer_type = $("#dropdown-whitetimemode").value;
-                  },
-                },
-                [
-                  m(
-                    "option",
-                    {
-                      value: "infinite",
-                      title: "First mover has infinite time",
-                    },
-                    "Infinite",
-                  ),
-                  m(
-                    "option",
-                    {
-                      value: "tournament",
-                      title:
-                        "First mover's time is limited and they can get time increment after every move.",
-                    },
-                    "Tournament",
-                  ),
-                  m(
-                    "option",
-                    {
-                      value: "time per move",
-                      title:
-                        "First mover must make every move within a fixed time limit.",
-                    },
-                    "Time Per Move",
-                  ),
-                  m(
-                    "option",
-                    {
-                      value: "hourglass",
-                      title:
-                        "First mover's time is limited and their used time on making a move will be added to second mover.",
-                    },
-                    "Hourglass",
-                  ),
-                  m(
-                    "option",
-                    {
-                      value: "byoyomi",
-                      title:
-                        "(See [Why can I choose different time modes for two sides?] for more details on this mode)",
-                    },
-                    "Byo-yomi",
-                  ),
-                ],
-              ),
-              timeSliders("white", white_timer_type, tc_white),
               m("input[type=number]#whitestarttime", {
                 hidden: true,
                 value: use_integer_inputs
@@ -11130,6 +10783,13 @@ const App = () => {
                   : tc_white.periods,
                 min: 1,
               }),
+              m("input[type=number]#whitedelaytime", {
+                hidden: true,
+                value: use_integer_inputs
+                  ? integer_input_white_delay_time
+                  : delaySteps[tc_white.delay],
+                min: 1,
+              }),
               m("input[type=number]#whitetimemargin", {
                 hidden: true,
                 value: use_integer_inputs
@@ -11140,67 +10800,6 @@ const App = () => {
             ]),
             ,
             m("div#blacktimesettings", [
-              m("p", "Black"),
-              m(
-                "select#dropdown-blacktimemode",
-                {
-                  disabled: !is_ready || review_mode,
-                  title: "The time control mode for second mover (black).",
-                  onchange: () => {
-                    $("#blacktimetype").innerHTML = $(
-                      "#dropdown-blacktimemode",
-                    ).value;
-                    black_timer_type = $("#dropdown-blacktimemode").value;
-                  },
-                },
-                [
-                  m(
-                    "option",
-                    {
-                      value: "infinite",
-                      title: "Second mover has infinite time",
-                    },
-                    "Infinite",
-                  ),
-                  m(
-                    "option",
-                    {
-                      value: "tournament",
-                      title:
-                        "Second mover's time is limited and they can get time increment after every move.",
-                    },
-                    "Tournament",
-                  ),
-                  m(
-                    "option",
-                    {
-                      value: "time per move",
-                      title:
-                        "Second mover must make every move within a fixed time limit.",
-                    },
-                    "Time Per Move",
-                  ),
-                  m(
-                    "option",
-                    {
-                      value: "hourglass",
-                      title:
-                        "Second mover's time is limited and their used time on making a move will be added to first mover.",
-                    },
-                    "Hourglass",
-                  ),
-                  m(
-                    "option",
-                    {
-                      value: "byoyomi",
-                      title:
-                        "(See [Why can I choose different time modes for two sides?] for more details on this mode)",
-                    },
-                    "Byo-yomi",
-                  ),
-                ],
-              ),
-              timeSliders("black", black_timer_type, tc_black),
               m("input[type=number]#blackstarttime", {
                 hidden: true,
                 value: use_integer_inputs
@@ -11227,6 +10826,13 @@ const App = () => {
                 value: use_integer_inputs
                   ? integer_input_black_byoyomi_periods
                   : tc_black.periods,
+                min: 1,
+              }),
+              m("input[type=number]#blackdelaytime", {
+                hidden: true,
+                value: use_integer_inputs
+                  ? integer_input_black_delay_time
+                  : delaySteps[tc_black.delay],
                 min: 1,
               }),
               m("input[type=number]#blacktimemargin", {
@@ -13118,7 +12724,9 @@ if (!support_condition.supported) {
   m.mount($("#root"), App);
 }
 
+//
 // Contents previously in main.js
+//
 
 const divMain = document.getElementsByTagName("main")[0];
 const variantsIni = document.getElementById("variants-ini");
@@ -13640,6 +13248,8 @@ document.addEventListener("gameend", (event) => {
         gametree.CurrentMove.Move.TextAfter.replace(/\[%end.*?\]/g, "");
       gametree.CurrentMove.Move.TextAfter += `[%end ${event.detail.result},${event.detail.reason}]`;
       updatePGNDivision(false);
+      chessground.cancelMove();
+      updateChessground(false);
     }
   }
 });
@@ -16454,14 +16064,6 @@ new Module().then((loadedModule) => {
 
   gameStatus.onclick = function () {
     let result = getGameStatus(false);
-    if (timerElapsePreviousPlayer) {
-      if (result == "PLAYING_WHITE") {
-        result = "PLAYING_BLACK";
-      } else if (result == "PLAYING_BLACK") {
-        result = "PLAYING_WHITE";
-      }
-    }
-    timerElapsePreviousPlayer = false;
     gameStatus.innerText = result;
   };
 
@@ -16533,7 +16135,6 @@ new Module().then((loadedModule) => {
       pBoardOrientation.click();
     }
     themedetector.SetOrientation(chessground.state.orientation);
-    timerElapsePreviousPlayer = false;
 
     updatePGNDivision(false);
 
@@ -18504,7 +18105,6 @@ function finishChessgroundDrop(move, choice) {
 function afterMove(move, capture) {
   if (move) {
     textMoves.value = (textMoves.value + " " + move).trim();
-    timerElapsePreviousPlayer = true;
   }
 
   pSetFen.click();
@@ -19257,7 +18857,7 @@ function updatePGNDivision(force_update = false, auto_scroll = true) {
   }
 }
 
-function updateChessground(showresult) {
+function updateChessground(apply_position) {
   closePromotionChoice();
   const boardfenval = board.fen();
   const boardfenvallist = boardfenval.split(" ");
@@ -19272,7 +18872,7 @@ function updateChessground(showresult) {
     pcheckCounts.hidden = true;
   }
 
-  if (showresult) {
+  if (apply_position) {
     gametree.SetCurrentMoveList(
       board.variant(),
       board.is960(),
@@ -19302,7 +18902,7 @@ function updateChessground(showresult) {
       },
     });
     displayHiddenDroppablePiece(board);
-    if (showresult && gametree.CurrentMove.Move.TextAfter) {
+    if (apply_position && gametree.CurrentMove.Move.TextAfter) {
       let parsedtext = moveutil.ParseTextActions(
         gametree.CurrentMove.Move.TextAfter,
       );
@@ -19392,5 +18992,5 @@ function updateChessground(showresult) {
 
   chessground.setAutoShapes([]);
 
-  getGameStatus(showresult);
+  getGameStatus(apply_position);
 }
