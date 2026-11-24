@@ -3688,7 +3688,11 @@ const App = () => {
       engine_match_played_game_count++;
       document.getElementById("enginematchinfo").innerText =
         `Games played: ${engine_match_played_game_count} | Total games to play: ${engine_match_total_game_count} | First engine (WHITE) wins: ${engine_match_white_wins} | Second engine (BLACK) wins: ${engine_match_black_wins} | Draws: ${engine_match_draws}`;
-      let info = fgs.GetCurrentGameInformation(window.ffishlib);
+      let info = fgs.GetCurrentGameInformation(
+        window.ffishlib,
+        event.detail.result,
+        event.detail.reason,
+      );
       engine_match_game_list.push(
         new fgs.Game(
           info.Variant,
@@ -4854,7 +4858,7 @@ const App = () => {
     timing_system.StopTiming();
     document.getElementById("whitetime").textContent = "--";
     document.getElementById("blacktime").textContent = "--";
-    $("#timeoutside").value = 0;
+    document.getElementById("gameendstatus").value = 0;
     document.getElementById("whitetimer").classList.remove("timer-active");
     document.getElementById("blacktimer").classList.remove("timer-active");
     document.getElementById("whitetime").classList.remove("time-exceeded");
@@ -4905,10 +4909,10 @@ const App = () => {
   const timeIsUpFor = (side) => {
     force_stop();
     if (side == "WHITE") {
-      $("#timeoutside").value = 1;
+      document.getElementById("gameendstatus").value = 1;
       document.getElementById("whitetime").textContent = "Out Of Time";
     } else if (side == "BLACK") {
-      $("#timeoutside").value = 2;
+      document.getElementById("gameendstatus").value = 2;
       document.getElementById("blacktime").textContent = "Out Of Time";
     }
     gameEnd();
@@ -7131,14 +7135,19 @@ const App = () => {
       return "Engine match finished";
     }
     const winner = {
-      "1-0": "White wins",
-      "0-1": "Black wins",
+      "1-0": `${playerColor(mover_color_scheme, "white")} wins`,
+      "0-1": `${playerColor(mover_color_scheme, "black")} wins`,
       "1/2-1/2": "Draw",
     }[outcome.result];
     if (!winner) {
       return "Game over";
     }
-    const suffix = outcome.reason == "time forfeit" ? " on time" : "";
+    let suffix = "";
+    if (outcome.reason == "time forfeit") {
+      suffix = " on time";
+    } else if (outcome.reason == "adjudication") {
+      suffix = " by adjudication";
+    }
     return `${outcome.result} · ${winner}${suffix}`;
   };
 
@@ -7301,7 +7310,7 @@ const App = () => {
     app_mode = "analysis";
     applyPlayerSettings();
     m.redraw();
-    document.getElementById("timeoutside").value = 0;
+    document.getElementById("gameendstatus").value = 0;
     updateChessground(false);
   };
 
@@ -7836,8 +7845,70 @@ const App = () => {
           ),
         ],
       ),
+      m("div#adjudications", { hidden: !game_started }, [
+        m(
+          "button#adjudicatewhitewin.sm.danger",
+          {
+            type: "button",
+            title: "Adjudicate first mover as winner.",
+            onclick: () => {
+              document.getElementById("gameendstatus").value = 2;
+              gameEnd();
+              document.dispatchEvent(
+                new CustomEvent("gameend", {
+                  detail: {
+                    result: "1-0",
+                    reason: "adjudication",
+                  },
+                }),
+              );
+            },
+          },
+          "Adjudicate 1-0",
+        ),
+        m(
+          "button#adjudicateblackwin.sm.danger",
+          {
+            type: "button",
+            title: "Adjudicate second mover as winner.",
+            onclick: () => {
+              document.getElementById("gameendstatus").value = 1;
+              gameEnd();
+              document.dispatchEvent(
+                new CustomEvent("gameend", {
+                  detail: {
+                    result: "0-1",
+                    reason: "adjudication",
+                  },
+                }),
+              );
+            },
+          },
+          "Adjudicate 0-1",
+        ),
+        m(
+          "button#adjudicatedraw.sm.danger",
+          {
+            type: "button",
+            title: "Adjudicate the game as draw.",
+            onclick: () => {
+              document.getElementById("gameendstatus").value = 3;
+              gameEnd();
+              document.dispatchEvent(
+                new CustomEvent("gameend", {
+                  detail: {
+                    result: "1/2-1/2",
+                    reason: "adjudication",
+                  },
+                }),
+              );
+            },
+          },
+          "Adjudicate 1/2-1/2",
+        ),
+      ]),
       m("div.boardnav", [
-        m("div#movecontrol", { hidden: during_play }, [
+        m("div#movecontrol", { hidden: game_started }, [
           m("div.navgroup", [
             m(
               "button#initialposition.iconbtn",
@@ -9009,7 +9080,7 @@ const App = () => {
               "END",
             ),
             m("input#engineoutputline", { hidden: true }),
-            m("input[type=number]#timeoutside", {
+            m("input[type=number]#gameendstatus", {
               placeholder: "Stores value that the side that run out of time",
               hidden: true,
             }),
@@ -12842,7 +12913,7 @@ const gameResult = document.getElementById("gameresult");
 const gameStatus = document.getElementById("gamestatus");
 const whiteTime = document.getElementById("whitetime");
 const blackTime = document.getElementById("blacktime");
-const timeOutSide = document.getElementById("timeoutside");
+const gameEndStatus = document.getElementById("gameendstatus");
 const loadThemes = document.getElementById("loadthemes");
 const initializeThemes = document.getElementById("initializethemes");
 const isBoardSetup = document.getElementById("isboardsetup");
@@ -17512,16 +17583,23 @@ function getGameStatus(showresult) {
     if (showresult) {
       gameResult.click();
     }
-  } else if (timeOutSide.value == 1) {
+  } else if (gameEndStatus.value == 1) {
     //console.log("White time out");
     gameResult.value = "0-1";
     result = "END";
     if (showresult) {
       gameResult.click();
     }
-  } else if (timeOutSide.value == 2) {
+  } else if (gameEndStatus.value == 2) {
     //console.log("Black time out");
     gameResult.value = "1-0";
+    result = "END";
+    if (showresult) {
+      gameResult.click();
+    }
+  } else if (gameEndStatus.value == 3) {
+    //console.log("Black time out");
+    gameResult.value = "1/2-1/2";
     result = "END";
     if (showresult) {
       gameResult.click();
@@ -17539,9 +17617,9 @@ function getGameStatus(showresult) {
 
 function resetTimer() {
   console.log("Timer reset!");
-  whiteTime.innerHTML = "--";
-  blackTime.innerHTML = "--";
-  timeOutSide.value = 0;
+  whiteTime.textContent = "--";
+  blackTime.textContent = "--";
+  gameEndStatus.value = 0;
 }
 
 function getDests(board) {

@@ -37,8 +37,6 @@
   background-image: url("./images/ui/landscape/landscape.avif");
 }
 
-h1,
-h2,
 .bg-highlight {
   text-shadow: var(--text-shadow-style-black);
 }

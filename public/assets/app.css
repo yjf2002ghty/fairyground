@@ -267,6 +267,14 @@ button.danger {
   color: var(--bad);
 }
 
+button.danger:hover {
+  background: var(--surface2);
+}
+
+button.danger:active {
+  background: var(--border);
+}
+
 button.ghost,
 .btn.ghost {
   background: transparent;
@@ -1007,6 +1015,7 @@ button.favbtn.on {
     "board board"
     "bottominfo bottomclock"
     "during during"
+    "adjudicate adjudicate"
     "nav nav"
     "notes notes";
   gap: 8px 12px;
@@ -1252,6 +1261,13 @@ cg-board {
 
 #timecontrolduringplay {
   grid-area: during;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#adjudications {
+  grid-area: adjudicate;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;

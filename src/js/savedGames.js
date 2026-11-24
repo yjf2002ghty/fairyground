@@ -84,7 +84,11 @@ export function SetPosition(FEN, UCIMoves, Variant, Is960, PGNString, Headers) {
   return true;
 }
 
-export function GetCurrentGameInformation(FFishJSLibrary) {
+export function GetCurrentGameInformation(
+  FFishJSLibrary,
+  CustomResult = "*",
+  CustomTermination = "Unterminated",
+) {
   const Variant =
     document.getElementById("dropdown-variant").value == ""
       ? "chess"
@@ -95,7 +99,6 @@ export function GetCurrentGameInformation(FFishJSLibrary) {
   const EngineBlack = document.getElementById("playblack").checked;
   const GameEvent = "Fairy-Stockfish Playground match";
   const Site = window.location.host;
-  const TimeoutSide = document.getElementById("timeoutside").value;
   const Is960 = document.getElementById("isfischerrandommode").checked;
   let whitename = "";
   let blackname = "";
@@ -141,7 +144,7 @@ export function GetCurrentGameInformation(FFishJSLibrary) {
       tmpboard.result(true) == "*" &&
       tmpboard.result(false) == "*"
     ) {
-      Termination = "Unterminated";
+      Termination = CustomTermination;
     }
     let gameresult = tmpboard.result();
     if (gameresult == "*") {
@@ -149,6 +152,8 @@ export function GetCurrentGameInformation(FFishJSLibrary) {
         gameresult = tmpboard.result(true);
       } else if (tmpboard.result(false) != "*") {
         gameresult = tmpboard.result(true);
+      } else {
+        gameresult = CustomResult;
       }
     }
     tmpboard.delete();
