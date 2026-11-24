@@ -172,8 +172,18 @@ export class EvaluationHistoryGraph {
 
   Draw() {
     const container_style = window.getComputedStyle(this.Container);
-    this.Canvas.width = this.Width = parseFloat(container_style.width);
-    this.Canvas.height = this.Height = parseFloat(container_style.height);
+    const new_width = parseFloat(container_style.width);
+    const new_height = parseFloat(container_style.height);
+    if (
+      new_width == 0 ||
+      isNaN(new_width) ||
+      new_height == 0 ||
+      isNaN(new_height)
+    ) {
+      return;
+    }
+    this.Canvas.width = this.Width = new_width;
+    this.Canvas.height = this.Height = new_height;
     this.CanvasContext.clearRect(0, 0, this.Width, this.Height);
     this.DescriptionElement.style.opacity = "0";
     const root_style = window.getComputedStyle(document.querySelector(":root"));

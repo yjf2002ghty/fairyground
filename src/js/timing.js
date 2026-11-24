@@ -51,6 +51,11 @@ function FormatSecond(Seconds, ShowColons = true) {
 }
 
 class BaseTimingLogic {
+  static TYPE = "sudden death";
+  static NAME = "Sudden death";
+  static DESCRIPTION =
+    "This player loses on time when the countdown reaches 0.";
+
   constructor(InitialTime, TimeoutMargin) {
     if (typeof InitialTime != "number" || typeof TimeoutMargin != "number") {
       throw TypeError();
@@ -59,7 +64,6 @@ class BaseTimingLogic {
     this.TimeoutMargin = TimeoutMargin;
     this.InitialTime = InitialTime;
     this.Running = false;
-    this.Name = "sudden death";
     this.History = [];
     this.PreviousStartRemainingTime = 0;
     this.PreviousElapsedTime = 0;
@@ -122,19 +126,24 @@ class BaseTimingLogic {
     return FormatSecond(this.RemainingTime / 1000, ShowColons);
   }
 
+  // Translate time control to engine readable time & increment
   TimeLeft() {
     return this.RemainingTime;
   }
 
+  // Translate time control to engine readable time & increment
   TimeIncrement() {
     return 0;
   }
 }
 
 class InfiniteTimingLogic extends BaseTimingLogic {
+  static TYPE = "infinite";
+  static NAME = "Infinite (No clock)";
+  static DESCRIPTION = "This player has infinite time.";
+
   constructor() {
     super(2147483647, 0);
-    this.Name = "infinite";
   }
 
   Elapse(TimeElapsed) {
@@ -167,11 +176,16 @@ class InfiniteTimingLogic extends BaseTimingLogic {
   }
 
   TimeIncrement() {
-    return 0;
+    return 2147483647;
   }
 }
 
 class FischerTimingLogic extends BaseTimingLogic {
+  static TYPE = "tournament";
+  static NAME = "Tournament (Fischer)";
+  static DESCRIPTION =
+    "This player has limited time and may get a time increment after a move.";
+
   constructor(InitialTime, TimeGain, TimeGainCooldownTurnCount, TimeoutMargin) {
     if (
       typeof InitialTime != "number" ||
@@ -182,7 +196,6 @@ class FischerTimingLogic extends BaseTimingLogic {
       throw TypeError();
     }
     super(InitialTime, TimeoutMargin);
-    this.Name = "tournament";
     this.TimeGain = TimeGain;
     this.TimeGainCooldownTurnCount = TimeGainCooldownTurnCount;
     this.CurrentTimeGainCooldownTurnCount = 0;
@@ -205,13 +218,17 @@ class FischerTimingLogic extends BaseTimingLogic {
   }
 }
 
-class TimePerMoveTimingLogic extends BaseTimingLogic {
+class FixedTimeTimingLogic extends BaseTimingLogic {
+  static TYPE = "fixed time";
+  static NAME = "Fixed time";
+  static DESCRIPTION =
+    "This player needs to make each move within a fixed time limit.";
+
   constructor(TimePerMove, TimeoutMargin) {
     if (typeof TimePerMove != "number" || typeof TimeoutMargin != "number") {
       throw TypeError();
     }
     super(TimePerMove, TimeoutMargin);
-    this.Name = "time per move";
   }
 
   OnCountDownStart() {
@@ -225,12 +242,16 @@ class TimePerMoveTimingLogic extends BaseTimingLogic {
 }
 
 class HourglassTimingLogic extends BaseTimingLogic {
+  static TYPE = "hourglass";
+  static NAME = "Hourglass";
+  static DESCRIPTION =
+    "This player has limited time and opponent's used time will be added to own time.";
+
   constructor(InitialTime, TimeoutMargin) {
     if (typeof InitialTime != "number" || typeof TimeoutMargin != "number") {
       throw TypeError();
     }
     super(InitialTime, TimeoutMargin);
-    this.Name = "hourglass";
   }
 
   OnCountDownStart(OpponentTimingLogic) {
@@ -246,6 +267,11 @@ class HourglassTimingLogic extends BaseTimingLogic {
 }
 
 class ByoyomiTimingLogic extends BaseTimingLogic {
+  static TYPE = "byoyomi";
+  static NAME = "Byo-yomi";
+  static DESCRIPTION =
+    "This player will enter the countdown (byoyomi) period(s) after their initial time runs out. During countdown periods, if the player make a move before the countdown period time runs out, the time will be reset to full time of countdown periods, otherwise the remaining period count will be decreased by 1 and the time will be reset to full time of countdown periods. If there's no countdown periods left and the remaining time runs out, this player runs out of time.";
+
   constructor(
     InitialTime,
     ByoyomiPeriodCount,
@@ -261,7 +287,6 @@ class ByoyomiTimingLogic extends BaseTimingLogic {
       throw TypeError();
     }
     super(InitialTime, TimeoutMargin);
-    this.Name = "byoyomi";
     this.ByoyomiPeriodCount = ByoyomiPeriodCount;
     this.ByoyomiPeriodLength = ByoyomiPeriodLength;
     this.RemainingByoyomiPeriodCount = ByoyomiPeriodCount;
@@ -311,15 +336,27 @@ class ByoyomiTimingLogic extends BaseTimingLogic {
   }
 
   TimeIncrement() {
-    if (this.RemainingByoyomiPeriodCount > 0) {
-      return this.ByoyomiPeriodLength;
+    if (
+      this.RemainingByoyomiPeriodCount == this.ByoyomiPeriodCount &&
+      this.RemainingByoyomiPeriodCount > 0
+    ) {
+      if (this.RemainingTime >= this.ByoyomiPeriodLength) {
+        return 0;
+      } else {
+        return this.ByoyomiPeriodLength - this.RemainingTime;
+      }
     } else {
-      return 0;
+      return this.ByoyomiPeriodLength;
     }
   }
 }
 
 class SimpleDelayTimingLogic extends BaseTimingLogic {
+  static TYPE = "simple delay";
+  static NAME = "Simple delay";
+  static DESCRIPTION =
+    "This player has limited time but the clock won't elapse if they make their move within the delay time at the start of each turn.";
+
   constructor(InitialTime, DelayTime, TimeoutMargin) {
     if (
       typeof InitialTime != "number" ||
@@ -331,7 +368,6 @@ class SimpleDelayTimingLogic extends BaseTimingLogic {
     super(InitialTime, TimeoutMargin);
     this.RemainingDelayTime = DelayTime;
     this.DelayTime = DelayTime;
-    this.Name = "simple delay";
   }
 
   Elapse(TimeElapsed) {
@@ -370,6 +406,11 @@ class SimpleDelayTimingLogic extends BaseTimingLogic {
 }
 
 class BronsteinTimingLogic extends BaseTimingLogic {
+  static TYPE = "bronstein";
+  static NAME = "Bronstein delay";
+  static DESCRIPTION =
+    "This player has limited time and may get a time increment after a move, but the clock won't exceed the time at the start of each turn, which prevents gaining extra time by making fast moves.";
+
   constructor(InitialTime, Increment, TimeoutMargin) {
     if (
       typeof InitialTime != "number" ||
@@ -380,7 +421,6 @@ class BronsteinTimingLogic extends BaseTimingLogic {
     }
     super(InitialTime, TimeoutMargin);
     this.Increment = Increment;
-    this.Name = "bronstein";
     this.StartedBefore = false;
   }
 
@@ -574,38 +614,38 @@ export class TimingSystem {
 }
 
 export const TIMER_TYPES = [
-  "sudden death",
-  "infinite",
-  "tournament",
-  "time per move",
-  "hourglass",
-  "byoyomi",
-  "simple delay",
-  "bronstein",
+  BaseTimingLogic.TYPE,
+  InfiniteTimingLogic.TYPE,
+  FischerTimingLogic.TYPE,
+  FixedTimeTimingLogic.TYPE,
+  HourglassTimingLogic.TYPE,
+  ByoyomiTimingLogic.TYPE,
+  SimpleDelayTimingLogic.TYPE,
+  BronsteinTimingLogic.TYPE,
 ];
 export const TIMER_TYPE_FRIENDLY_NAMES = [
-  "Sudden death",
-  "Infinite (No clock)",
-  "Tournament (Fischer)",
-  "Fixed time",
-  "Hourglass",
-  "Byo-yomi",
-  "Simple delay",
-  "Bronstein delay",
+  BaseTimingLogic.NAME,
+  InfiniteTimingLogic.NAME,
+  FischerTimingLogic.NAME,
+  FixedTimeTimingLogic.NAME,
+  HourglassTimingLogic.NAME,
+  ByoyomiTimingLogic.NAME,
+  SimpleDelayTimingLogic.NAME,
+  BronsteinTimingLogic.NAME,
 ];
 export const TIMER_TYPE_DESCRIPTIONS = [
-  "This player loses on time when the countdown reaches 0.",
-  "This player has infinite time.",
-  "This player has limited time and may get a time increment after a move.",
-  "This player needs to make each move within a fixed time limit.",
-  "This player has limited time and opponent's used time will be added to own time.",
-  "This player will enter the countdown (byoyomi) period(s) after their initial time runs out. During countdown periods, if the player make a move before the countdown period time runs out, the time will be reset to full time of countdown periods, otherwise the remaining period count will be decreased by 1 and the time will be reset to full time of countdown periods. If there's no countdown periods left and the remaining time runs out, this player runs out of time.",
-  "This player has limited time but the clock won't elapse if they make their move within the delay time at the start of each turn.",
-  "This player has limited time and may get a time increment after a move, but the clock won't exceed the time at the start of each turn, which prevents gaining extra time by making fast moves.",
+  BaseTimingLogic.DESCRIPTION,
+  InfiniteTimingLogic.DESCRIPTION,
+  FischerTimingLogic.DESCRIPTION,
+  FixedTimeTimingLogic.DESCRIPTION,
+  HourglassTimingLogic.DESCRIPTION,
+  ByoyomiTimingLogic.DESCRIPTION,
+  SimpleDelayTimingLogic.DESCRIPTION,
+  BronsteinTimingLogic.DESCRIPTION,
 ];
 
 export const DEFAULT_TIMING_SETTINGS = {
-  type: "sudden death",
+  type: BaseTimingLogic.TYPE,
   initial_time: 300000,
   increment: 0,
   byoyomi_periods: 3,
@@ -629,7 +669,7 @@ export function GetTimerInformation(TimerType, AddClockSuffix = false) {
 
 /* TimingSettings:
  *  {
- *      type: "sudden death" | "infinite" | "tournament" | "time per move" | "hourglass" | "byoyomi" | "bronstein" | "simple delay",
+ *      type: "sudden death" | "infinite" | "tournament" | "fixed time" | "hourglass" | "byoyomi" | "bronstein" | "simple delay",
  *      initial_time: number,
  *      increment: number,
  *      byoyomi_periods: number,
@@ -672,26 +712,26 @@ export function CreateTimingLogic(TimingSettings) {
   if (!IsNonNegativeNumber(timeout_margin)) {
     timeout_margin = DEFAULT_TIMING_SETTINGS.timeout_margin;
   }
-  if (TimingSettings.type == "sudden death") {
+  if (TimingSettings.type == BaseTimingLogic.TYPE) {
     return new BaseTimingLogic(initial_time, timeout_margin);
-  } else if (TimingSettings.type == "infinite") {
+  } else if (TimingSettings.type == InfiniteTimingLogic.TYPE) {
     return new InfiniteTimingLogic();
-  } else if (TimingSettings.type == "tournament") {
+  } else if (TimingSettings.type == FischerTimingLogic.TYPE) {
     return new FischerTimingLogic(initial_time, increment, 0, timeout_margin);
-  } else if (TimingSettings.type == "time per move") {
-    return new TimePerMoveTimingLogic(initial_time, timeout_margin);
-  } else if (TimingSettings.type == "hourglass") {
+  } else if (TimingSettings.type == FixedTimeTimingLogic.TYPE) {
+    return new FixedTimeTimingLogic(initial_time, timeout_margin);
+  } else if (TimingSettings.type == HourglassTimingLogic.TYPE) {
     return new HourglassTimingLogic(initial_time, timeout_margin);
-  } else if (TimingSettings.type == "byoyomi") {
+  } else if (TimingSettings.type == ByoyomiTimingLogic.TYPE) {
     return new ByoyomiTimingLogic(
       initial_time,
       byoyomi_periods,
       byoyomi_period_length,
       timeout_margin,
     );
-  } else if (TimingSettings.type == "simple delay") {
+  } else if (TimingSettings.type == SimpleDelayTimingLogic.TYPE) {
     return new SimpleDelayTimingLogic(initial_time, delay_time, timeout_margin);
-  } else if (TimingSettings.type == "bronstein") {
+  } else if (TimingSettings.type == BronsteinTimingLogic.TYPE) {
     return new BronsteinTimingLogic(initial_time, increment, timeout_margin);
   } else {
     throw Error(`Invalid timer type: ${TimingSettings.type}`);

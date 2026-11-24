@@ -4840,8 +4840,6 @@ const App = () => {
     timing_system.SetCurrentRound(stm == "black" ? 1 : 0);
     timing_system.SetOnTimeElapsedCallback(timerOnUpdate);
     timing_system.SetOnOutOfTimeCallback(timerOnTimeout);
-    white_timer_type = white_timing_logic.Name;
-    black_timer_type = black_timing_logic.Name;
     white_engine_remaining_time = white_timing_logic.TimeLeft();
     white_engine_time_increment = white_timing_logic.TimeIncrement();
     black_engine_remaining_time = black_timing_logic.TimeLeft();
@@ -6789,9 +6787,7 @@ const App = () => {
       [
         use_integer_inputs
           ? integerInput(
-              mode == "time per move"
-                ? "Time per move (ms)"
-                : "Start time (ms)",
+              mode == "fixed time" ? "Time per move (ms)" : "Start time (ms)",
               "1",
               "",
               default_start_time,
@@ -6802,11 +6798,13 @@ const App = () => {
                   integer_input_black_start_time = value;
                 }
               },
-              "The time in milliseconds at the beginning of the game.",
+              mode == "fixed time"
+                ? "The time in milliseconds at the beginning of each turn."
+                : "The time in milliseconds at the beginning of the game.",
               true,
             )
           : sliderRow(
-              mode == "time per move" ? "Time per move" : "Start time",
+              mode == "fixed time" ? "Time per move" : "Start time",
               formatClock(startTimeSteps[tc.start]),
               0,
               startTimeSteps.length - 1,
@@ -6814,7 +6812,9 @@ const App = () => {
               (value) => {
                 tc.start = value;
               },
-              "The time at the beginning of the game.",
+              mode == "fixed time"
+                ? "The time at the beginning of each turn."
+                : "The time at the beginning of the game.",
             ),
         m("div", { hidden: mode != "tournament" && mode != "bronstein" }, [
           use_integer_inputs
@@ -7039,7 +7039,7 @@ const App = () => {
   // on their own and are left alone.
   const clockModes = [
     "tournament",
-    "time per move",
+    "fixed time",
     "hourglass",
     "byoyomi",
     "bronstein",
@@ -7807,7 +7807,7 @@ const App = () => {
                 timing_system.AddTime(0, 10000);
               },
             },
-            "+10 s white",
+            `+10 s ${playerColor(mover_color_scheme, "white")}`,
           ),
           m(
             "button#addtimeforblack.sm",
@@ -7818,7 +7818,7 @@ const App = () => {
                 timing_system.AddTime(1, 10000);
               },
             },
-            "+10 s black",
+            `+10 s ${playerColor(mover_color_scheme, "black")}`,
           ),
           m(
             "button#gameabort.sm.danger",
@@ -10424,19 +10424,20 @@ const App = () => {
             [
               "movetime",
               "Time per move",
-              "This player needs to make each move within a fixed search time limit.",
+              "This engine needs to make each move within a fixed search time limit. No clock and no timeout in this mode.",
             ],
             [
               "depth",
               "Depth per move",
-              "This player needs to make each move within a fixed search depth limit.",
+              "This player needs to make each move within a fixed search depth limit. No clock and no timeout in this mode.",
             ],
             [
               "nodes",
               "Nodes per move",
-              "This player needs to make each move within a fixed search node limit.",
+              "This player needs to make each move within a fixed search node limit. No clock and no timeout in this mode.",
             ],
             timing.GetTimerInformation("tournament", true),
+            timing.GetTimerInformation("fixed time", true),
             timing.GetTimerInformation("hourglass", true),
             timing.GetTimerInformation("byoyomi", true),
             timing.GetTimerInformation("simple delay", true),
@@ -10445,7 +10446,7 @@ const App = () => {
         : [
             timing.GetTimerInformation("infinite"),
             timing.GetTimerInformation("tournament"),
-            timing.GetTimerInformation("time per move"),
+            timing.GetTimerInformation("fixed time"),
             timing.GetTimerInformation("hourglass"),
             timing.GetTimerInformation("byoyomi"),
             timing.GetTimerInformation("simple delay"),
