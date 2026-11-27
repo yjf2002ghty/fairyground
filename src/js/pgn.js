@@ -79,23 +79,23 @@ function IsBracketEnclosureCorrect(Text) {
   if (typeof Text != "string") {
     throw TypeError();
   }
+  const brackets = new Map([
+    ["(", ")"],
+    ["{", "}"],
+  ]);
+  const open_brackets = [...brackets.keys()];
+  const close_brackets = [...brackets.values()];
   let stack = [];
   let i = 0;
   let ch;
+  let index = 0;
   for (i = 0; i < Text.length; i++) {
     ch = Text[i];
-    if (ch == "(" || ch == "[" || ch == "{") {
+    if (open_brackets.includes(ch)) {
       stack.push(ch);
-    } else if (ch == ")") {
-      if (stack.pop() != "(") {
-        return false;
-      }
-    } else if (ch == "]") {
-      if (stack.pop() != "[") {
-        return false;
-      }
-    } else if (ch == "}") {
-      if (stack.pop() != "{") {
+    } else if (close_brackets.includes(ch)) {
+      index = close_brackets.indexOf(ch);
+      if (stack.pop() != open_brackets[index]) {
         return false;
       }
     }
@@ -110,36 +110,45 @@ function PreprocessPGN(MovesText) {
   let i = 0;
   let isinbracket = 0;
   let result = [];
-  for (i = 0; i < MovesText.length; i++) {
-    if (MovesText[i] == " ") {
+  let linechange_formatted_text = MovesText.replace(
+    AllLineSplitterMatcher,
+    "\n",
+  );
+  for (i = 0; i < linechange_formatted_text.length; i++) {
+    if (linechange_formatted_text[i] == "\n") {
+      if (isinbracket == 0) {
+        result.push(" ");
+        continue;
+      }
+    } else if (linechange_formatted_text[i] == " ") {
       if (isinbracket > 0) {
         result.push("\x03");
         continue;
       }
-    } else if (MovesText[i] == "{") {
+    } else if (linechange_formatted_text[i] == "{") {
       isinbracket++;
       if (isinbracket == 1) {
         result.push(" {");
         continue;
       }
-    } else if (MovesText[i] == "}") {
+    } else if (linechange_formatted_text[i] == "}") {
       isinbracket--;
       if (isinbracket == 0) {
         result.push("} ");
         continue;
       }
-    } else if (MovesText[i] == "(") {
+    } else if (linechange_formatted_text[i] == "(") {
       if (isinbracket == 0) {
         result.push(" ( ");
         continue;
       }
-    } else if (MovesText[i] == ")") {
+    } else if (linechange_formatted_text[i] == ")") {
       if (isinbracket == 0) {
         result.push(" ) ");
         continue;
       }
     }
-    result.push(MovesText[i]);
+    result.push(linechange_formatted_text[i]);
   }
   return result.join("");
 }
@@ -187,11 +196,8 @@ export function ParsePGNMovesToMoveTree(
   let board = new FFishJSLibrary.Board(Variant, fen, IsFischerRandom);
   let tree = new movelib.MoveTree();
   let i = 0;
-  let items = PreprocessPGN(MovesText)
-    .trim()
-    .replace(AllPGNLineCommentMatcher, " ")
-    .replace(AllLineSplitterMatcher, " ")
-    .split(WhiteSpaceMatcher);
+  let items = PreprocessPGN(MovesText).trim().split(WhiteSpaceMatcher);
+  console.log(items);
   let content = "";
   let aftermovenum = false;
   let stack = [];
@@ -220,16 +226,12 @@ export function ParsePGNMovesToMoveTree(
     if (content.startsWith("{") && content.endsWith("}")) {
       if (addingvariation || aftermovenum) {
         textbefore.push(
-          content
-            .slice(1, -1)
-            .replace(AllWhiteSpacePlaceHolderMatcher, " ")
-            .replace(AllTextLineSplitterMatcher, "\n"),
+          content.slice(1, -1).replace(AllWhiteSpacePlaceHolderMatcher, " "),
         );
       } else {
         pointer.Move.TextAfter += content
           .slice(1, -1)
-          .replace(AllWhiteSpacePlaceHolderMatcher, " ")
-          .replace(AllTextLineSplitterMatcher, "\n");
+          .replace(AllWhiteSpacePlaceHolderMatcher, " ");
       }
     } else if (content.startsWith("$")) {
       if (pointer == tree.RootNode || addingvariation || aftermovenum) {

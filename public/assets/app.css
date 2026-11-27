@@ -35,6 +35,14 @@
   --topbar-h: 60px;
   --surface-alpha: 1;
   color-scheme: light;
+
+  --disastrous-move-color: #dc143c;
+  --bad-move-color: #ffa500;
+  --dubious-move-color: #ffd700;
+  --interesting-move-color: #7cfc00;
+  --good-move-color: #48d1cc;
+  --brilliant-move-color: #0088ff;
+  --best-move-color: #8800ff;
 }
 
 *,
@@ -1639,6 +1647,14 @@ button.inioption {
   align-items: center;
 }
 
+#pgndiv .pgn-title {
+  white-space: pre-wrap;
+  font-size: 16px;
+  font-weight: bold;
+  text-align: center;
+  width: 100%;
+}
+
 #pgndiv div.branch {
   display: flex;
   flex-direction: row;
@@ -2213,7 +2229,8 @@ spangameresultmini {
 }
 
 #whiteenginesettings > p,
-#blackenginesettings > p {
+#blackenginesettings > p,
+#analysisenginesettings > p {
   flex: 0 0 100%;
   font-weight: 700;
   font-size: 12.5px;
@@ -2986,8 +3003,22 @@ div.popup textarea {
 #imagegeneratoractions,
 #pgnheadercontrol,
 #pgnsymbolscontrol,
-#pgntextcontrol {
+#pgntextcontrol,
+#autoanalysis-control {
   justify-content: flex-end;
+}
+
+#autoanalysis input[type="number"] {
+  width: 200px;
+}
+
+#autoanalysis .sliderhead {
+  width: 200px;
+}
+
+#autoanalysis-evalhistory {
+  position: relative;
+  height: 200px;
 }
 
 #imagegenerationprogress {
@@ -3027,6 +3058,16 @@ div.popup textarea {
   grid-template-columns: 1fr 1fr;
 }
 
+#autoanalysis-blocker {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #7777;
+  z-index: 997;
+}
+
 /* ---------- move context menu ---------- */
 
 .ctxmenu {
@@ -3063,10 +3104,6 @@ div.popup textarea {
 }
 
 /* ---------- evaluation history graph ---------- */
-
-#evalhistory .label {
-  cursor: help;
-}
 
 #evalhistorycontainer {
   height: 200px;

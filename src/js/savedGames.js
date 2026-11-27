@@ -73,9 +73,11 @@ export function SetPosition(FEN, UCIMoves, Variant, Is960, PGNString, Headers) {
   const move = document.getElementById("move");
   const setpos = document.getElementById("setpos");
   if (PGNString) {
-    pgnstring.value =
-      FEN + "\x01" + UCIMoves + "\x01" + PGNString + "\x01" + Headers;
-    pgnstring.click();
+    pgnstring.dispatchEvent(
+      new CustomEvent("setpos", {
+        detail: FEN + "\x01" + UCIMoves + "\x01" + PGNString + "\x01" + Headers,
+      }),
+    );
   } else {
     fen.value = FEN.trim();
     move.value = UCIMoves.trim();
@@ -439,7 +441,7 @@ export class PortableGameNotation {
         Is960,
       );
       let result = "";
-      let moveslist = RemovePGNNotes(SANMoves)
+      let moveslist = RemovePGNNotes(SANMoves.replace(/\n/g, " "))
         .split(WhiteSpaceMatcher2)
         .reverse()
         .filter((val) => {
@@ -616,7 +618,7 @@ export class PortableGameNotation {
       "\n",
     ).split("\n");
     for (i = 0; i < rawText.length; i++) {
-      if (rawText[i].startsWith("#") || rawText[i] == "") {
+      if (rawText[i].startsWith("#")) {
         continue;
       } else if (rawText[i].startsWith("[") && rawText[i].endsWith("]")) {
         let text = rawText[i].slice(1).slice(0, -1);
@@ -783,7 +785,9 @@ export class PortableGameNotation {
         }
       } else if (ParserStarts) {
         ParserState = 0;
-        SANMoves += " " + rawText[i];
+        SANMoves += "\n" + rawText[i];
+      } else if (rawText[i] == "") {
+        continue;
       } else {
         console.warn(
           `At line ${i + 1} of PGN file: Syntax Error: A PGN file must begin with configuration entries.`,

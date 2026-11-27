@@ -12,6 +12,8 @@ import * as myvariants from "./myVariants.js";
 import * as evalhistory from "./evalhistory.js";
 import * as boardpeek from "./boardInMoveListPanel.js";
 import * as timing from "./timing.js";
+import * as analysisutil from "./analysisUtil.js";
+import * as autoanalysis from "./automaticAnalysis.js";
 import * as fge from "./binaryEngine.js";
 import * as fgs from "./savedGames.js";
 
@@ -218,6 +220,15 @@ const FriendlyGameTerminationNames = [
   "Ended by game rule",
 ];
 
+let auto_analysis_handler = new autoanalysis.AutomaticAnalysisHandler(
+  1,
+  "white",
+  [],
+  "",
+  () => {},
+  () => {},
+  () => {},
+);
 let ffishnotationobjects = null;
 var PositionVariantsDirectory = new Map();
 // Read access for the UI (variant picker): Map<positiontype, Map<name, game>>
@@ -429,6 +440,49 @@ class GameTree {
       }
     }
     this.CurrentMove = pointer;
+  }
+
+  AddMoveListToMove(MoveNode, MoveList) {
+    if (
+      !(MoveNode instanceof moveutil.MoveTreeNode) ||
+      typeof MoveList != "string"
+    ) {
+      throw TypeError();
+    }
+    const trimmedmoves = MoveList.trim();
+    let movelist = trimmedmoves.split(this.BlankSplitter);
+    let i = 0,
+      j = 0;
+    let node_id = -1;
+    let pointer = MoveNode;
+    if (trimmedmoves.length == 0) {
+      return;
+    }
+    for (i = 0; i < movelist.length; i++) {
+      node_id = -1;
+      for (j = 0; j < pointer.NextNodes.length; j++) {
+        if (pointer.NextNodes[j].Move.Move == movelist[i]) {
+          node_id = j;
+          break;
+        }
+      }
+      if (node_id == -1) {
+        for (j = i; j < movelist.length; j++) {
+          pointer.AddVariationNode(
+            new moveutil.MoveTreeNode(
+              new moveutil.Move(movelist[j], 0, 0),
+              undefined,
+              [],
+            ),
+          );
+          pointer = pointer.NextNodes[pointer.NextNodes.length - 1];
+        }
+        this.ClearHistory();
+        break;
+      } else {
+        pointer = pointer.NextNodes[node_id];
+      }
+    }
   }
 
   GetMoveListOfMove(MoveNode) {
@@ -701,14 +755,14 @@ class GameTree {
     this.GameHeaders.set("Black", BlackName);
   }
 
-  GetHeaderString(FallbackWhiteName, FallbackBlackName) {
+  GetHeaders(FallbackWhiteName, FallbackBlackName) {
     if (
       typeof FallbackWhiteName != "string" ||
       typeof FallbackBlackName != "string"
     ) {
       throw TypeError();
     }
-    let result = [];
+    let result = new Map();
     let termination = "";
     let tmpboard = new ffish.Board(this.Variant, this.OriginalFEN, this.Is960);
     let tmpboardresult;
@@ -743,31 +797,45 @@ class GameTree {
     } else {
       termination = "normal";
     }
-    result.push(
-      `[Event "${this.GameHeaders.get("Event") || "Fairy-Stockfish playground game"}"]`,
+    result.set(
+      "Event",
+      this.GameHeaders.get("Event") || "Fairy-Stockfish playground game",
     );
-    result.push(
-      `[Site "${this.GameHeaders.get("Site") || window.location.host}"]`,
+    result.set("Site", this.GameHeaders.get("Site") || window.location.host);
+    result.set("Round", this.GameHeaders.get("Round") || "1");
+    result.set(
+      "Date",
+      this.GameHeaders.get("Date") ||
+        `${today.getFullYear()}.${today.getMonth() + 1}.${today.getDate()}`,
     );
-    result.push(`[Round "${this.GameHeaders.get("Round") || "1"}"]`);
-    result.push(
-      `[Date "${this.GameHeaders.get("Date") || String(today.getFullYear()) + "." + String(today.getMonth() + 1) + "." + String(today.getDate())}"]`,
-    );
-    result.push(
-      `[White "${this.GameHeaders.get("White") || FallbackWhiteName}"]`,
-    );
-    result.push(
-      `[Black "${this.GameHeaders.get("Black") || FallbackBlackName}"]`,
-    );
-    result.push(`[Result "${tmpboardresult}"]`);
-    result.push(`[FEN "${this.OriginalFEN}"]\n[SetUp "1"]`);
-    result.push(
-      `[Variant "${this.Is960 ? this.Variant + "960" : this.Variant}"]`,
-    );
-    if (termination != "") {
-      result.push(`[Termination "${termination}"]`);
-    }
+    result.set("White", this.GameHeaders.get("White") || FallbackWhiteName);
+    result.set("Black", this.GameHeaders.get("Black") || FallbackBlackName);
+    result.set("Result", tmpboardresult);
+    result.set("FEN", this.OriginalFEN);
+    result.set("SetUp", "1");
+    result.set("Variant", this.Is960 ? this.Variant + "960" : this.Variant);
+    result.set("Termination", termination);
+    this.GameHeaders.forEach((value, key) => {
+      if (!result.has(key)) {
+        result.set(key, value);
+      }
+    });
     tmpboard.delete();
+    return result;
+  }
+
+  GetHeaderString(FallbackWhiteName, FallbackBlackName) {
+    if (
+      typeof FallbackWhiteName != "string" ||
+      typeof FallbackBlackName != "string"
+    ) {
+      throw TypeError();
+    }
+    let result = [];
+    let headers = this.GetHeaders(FallbackWhiteName, FallbackBlackName);
+    headers.forEach((value, key) => {
+      result.push(`[${key} "${value}"]`);
+    });
     return result.join("\n");
   }
 
@@ -952,10 +1020,15 @@ class GameTree {
       result.push(tmpboardresult);
     }
     tmpboard.delete();
-    return result.join(" ").replace(/\n/g, "\\n");
+    return result.join(" ");
   }
 
-  ToPGNDiv(Notation, Mode = "flat", Orientation = "white") {
+  ToPGNDiv(
+    Notation,
+    Mode = "flat",
+    Orientation = "white",
+    ShowHeaders = false,
+  ) {
     if (
       Notation == null ||
       typeof Mode != "string" ||
@@ -1002,6 +1075,7 @@ class GameTree {
     let lastmainlinemove = this.MoveTree.RootNode;
     let terminationstr;
     let evalstr = "";
+    let text_css = "";
     let pgn_container_vnodes = [];
     let vnode_types = [];
     let previous_onclick_handler = null;
@@ -1020,13 +1094,25 @@ class GameTree {
         ) || 1
       : 1;
 
-    const VNODE_SPLITTER_START = 0;
-    const VNODE_SPLITTER_END = 1;
-    const VNODE_MOVE_NUMBER = 2;
-    const VNODE_FIRST_MOVE = 3;
-    const VNODE_SECOND_MOVE = 4;
-    const VNODE_INLINE_OBJECT = 5;
-    const VNODE_BLOCK_OBJECT = 6;
+    const VNODE_TITLE = 0;
+    const VNODE_SPLITTER_START = 1;
+    const VNODE_SPLITTER_END = 2;
+    const VNODE_MOVE_NUMBER = 3;
+    const VNODE_FIRST_MOVE = 4;
+    const VNODE_SECOND_MOVE = 5;
+    const VNODE_INLINE_OBJECT = 6;
+    const VNODE_BLOCK_OBJECT = 7;
+
+    if (ShowHeaders) {
+      const headers = this.GetHeaders("?", "?");
+      pgn_container_vnodes.push(
+        m(
+          "p.pgn-title",
+          `${headers.get("Event")}\n${headers.get("White")} - ${headers.get("Black")}\n${headers.get("Site")}, ${headers.get("Date")}, Round ${headers.get("Round")}\n${headers.get("Result")}`,
+        ),
+      );
+      vnode_types.push(VNODE_TITLE);
+    }
 
     info_struct.moveturn = tmpboard.turn() ? "white" : "black";
     info_struct.checked = getCheckSquares(tmpboard);
@@ -1206,13 +1292,14 @@ class GameTree {
             (parsedtext.get("cal") ?? "") + "," + (parsedtext.get("csl") ?? "");
           terminationstr = (parsedtext.get("end") ?? "").split(",");
           evalstr = parsedtext.get("eval") ?? "";
+          text_css = parsedtext.get("css") ?? "";
           if (evalstr) {
             if (evalstr.startsWith("#")) {
               pgn_container_vnodes.push(
                 m(
                   "p.evaluation-text",
                   {
-                    title: getEvaluationDescription(
+                    title: analysisutil.GetEvaluationDescription(
                       parseFloat(evalstr.substring(1)),
                       true,
                     ),
@@ -1225,7 +1312,10 @@ class GameTree {
                 m(
                   "p.evaluation-text",
                   {
-                    title: getEvaluationDescription(parseFloat(evalstr), false),
+                    title: analysisutil.GetEvaluationDescription(
+                      parseFloat(evalstr),
+                      false,
+                    ),
                   },
                   evalstr,
                 ),
@@ -1297,6 +1387,9 @@ class GameTree {
             pgn_container_vnodes.push(
               m(
                 `p.text-after${tokens[i].Move.TextAfter.includes("\n") ? ".full-line" : ""}`,
+                {
+                  style: text_css,
+                },
                 displaytextafter,
               ),
             );
@@ -1389,7 +1482,6 @@ class GameTree {
       let level = 0;
       let current_list = [];
       let previous_list;
-      let element;
       for (i = 0; i < pgn_container_vnodes.length; i++) {
         if (vnode_types[i] == VNODE_SPLITTER_START) {
           stack.push(current_list);
@@ -1397,8 +1489,7 @@ class GameTree {
           level++;
         } else if (vnode_types[i] == VNODE_SPLITTER_END) {
           previous_list = current_list;
-          element = stack.pop();
-          current_list = element;
+          current_list = stack.pop();
           current_list.push(m("div.branch", previous_list));
           level--;
         } else {
@@ -1434,35 +1525,27 @@ class GameTree {
       let current_move_element = new_move_grid();
       let current_move_inline_elements = [];
       let previous_list;
-      let element;
       for (i = 0; i < pgn_container_vnodes.length; i++) {
-        if (vnode_types[i] == VNODE_SPLITTER_START) {
-          if (RECURSE || level == 0) {
-            if (current_move_element.move_number) {
-              current_list.push(generate_move_element(current_move_element));
-              current_move_element = new_move_grid();
-            }
-            stack.push(current_list);
-            current_list = [];
-          } else {
-            current_list.push(pgn_container_vnodes[i]);
+        if (vnode_types[i] == VNODE_TITLE) {
+          current_list.push(pgn_container_vnodes[i]);
+        } else if (vnode_types[i] == VNODE_SPLITTER_START) {
+          if (current_move_element.move_number) {
+            current_list.push(generate_move_element(current_move_element));
+            current_move_element = new_move_grid();
           }
+          stack.push(current_list);
+          current_list = [];
           level++;
         } else if (vnode_types[i] == VNODE_SPLITTER_END) {
-          if (RECURSE || level == 1) {
-            if (RECURSE && current_move_element.move_number) {
-              current_list.push(
-                generate_move_element(current_move_element, true),
-              );
-              current_move_element = new_move_grid();
-            }
-            previous_list = current_list;
-            element = stack.pop();
-            current_list = element;
-            current_list.push(m("div.branch", previous_list));
-          } else {
-            current_list.push(pgn_container_vnodes[i]);
+          if (RECURSE && current_move_element.move_number) {
+            current_list.push(
+              generate_move_element(current_move_element, true),
+            );
+            current_move_element = new_move_grid();
           }
+          previous_list = current_list;
+          current_list = stack.pop();
+          current_list.push(m("div.branch", previous_list));
           level--;
         } else {
           if (RECURSE || level == 0) {
@@ -1522,41 +1605,33 @@ class GameTree {
       let current_move_element = new_move_grid();
       let current_move_inline_elements = [];
       let previous_list;
-      let element;
       let current_half_move_number = this.MoveTree.InitialHalfMoveNumber;
       let half_move_number_stack = [];
       for (i = 0; i < pgn_container_vnodes.length; i++) {
-        if (vnode_types[i] == VNODE_MOVE_NUMBER) {
+        if (vnode_types[i] == VNODE_TITLE) {
+          current_list.push(pgn_container_vnodes[i]);
+        } else if (vnode_types[i] == VNODE_MOVE_NUMBER) {
           continue;
         } else if (vnode_types[i] == VNODE_SPLITTER_START) {
           half_move_number_stack.push(current_half_move_number--);
-          if (RECURSE || level == 0) {
-            if (current_move_element.move_number) {
-              current_list.push(generate_move_element(current_move_element));
-              current_move_element = new_move_grid();
-            }
-            stack.push(current_list);
-            current_list = [];
-          } else {
-            current_list.push(pgn_container_vnodes[i]);
+          if (current_move_element.move_number) {
+            current_list.push(generate_move_element(current_move_element));
+            current_move_element = new_move_grid();
           }
+          stack.push(current_list);
+          current_list = [];
           level++;
         } else if (vnode_types[i] == VNODE_SPLITTER_END) {
           current_half_move_number = half_move_number_stack.pop();
-          if (RECURSE || level == 1) {
-            if (RECURSE && current_move_element.move_number) {
-              current_list.push(
-                generate_move_element(current_move_element, true),
-              );
-              current_move_element = new_move_grid();
-            }
-            previous_list = current_list;
-            element = stack.pop();
-            current_list = element;
-            current_list.push(m("div.branch", previous_list));
-          } else {
-            current_list.push(pgn_container_vnodes[i]);
+          if (RECURSE && current_move_element.move_number) {
+            current_list.push(
+              generate_move_element(current_move_element, true),
+            );
+            current_move_element = new_move_grid();
           }
+          previous_list = current_list;
+          current_list = stack.pop();
+          current_list.push(m("div.branch", previous_list));
           level--;
         } else {
           if (RECURSE || level == 0) {
@@ -2056,6 +2131,9 @@ document.addEventListener("onpageload", () => {
     }
     if (localStorage.getItem("AdvancedPGNMode") == "false") {
       document.getElementById("isadvpgnmode").click();
+    }
+    if (localStorage.getItem("PGNShowHeaders") == "true") {
+      document.getElementById("pgnshowheaders").click();
     }
     if (localStorage.getItem("ShowMovesDialog") == "true") {
       document.getElementById("showmovediv").click();
@@ -3599,34 +3677,34 @@ const App = () => {
   let random_mover_white = false;
   let random_mover_black = false;
   let advanced_pgn_mode = true;
-  let white_remaining_time = 0;
-  let black_remaining_time = 0;
-  let white_moving_time_list = [];
-  let black_moving_time_list = [];
-  let white_time_gain = 0;
-  let black_time_gain = 0;
+  // let white_remaining_time = 0;
+  // let black_remaining_time = 0;
+  // let white_moving_time_list = [];
+  // let black_moving_time_list = [];
+  // let white_time_gain = 0;
+  // let black_time_gain = 0;
   let white_timer_type = "infinite";
   let black_timer_type = "infinite";
   let timer_interval = 100;
-  let white_byoyomi_time_per_period = 0;
-  let black_byoyomi_time_per_period = 0;
-  let white_byoyomi_period_count = 0;
-  let black_byoyomi_period_count = 0;
-  let white_remaining_byoyomi_periods = 0;
-  let black_remaining_byoyomi_periods = 0;
-  let white_time_delay = 0;
-  let black_time_delay = 0;
-  let white_time_margin = 0;
-  let black_time_margin = 0;
-  let timeout_margin = 500;
+  // let white_byoyomi_time_per_period = 0;
+  // let black_byoyomi_time_per_period = 0;
+  // let white_byoyomi_period_count = 0;
+  // let black_byoyomi_period_count = 0;
+  // let white_remaining_byoyomi_periods = 0;
+  // let black_remaining_byoyomi_periods = 0;
+  // let white_time_delay = 0;
+  // let black_time_delay = 0;
+  // let white_time_margin = 0;
+  // let black_time_margin = 0;
+  // let timeout_margin = 500;
   let white_engine_remaining_time = 0;
   let black_engine_remaining_time = 0;
   let white_engine_time_increment = 0;
   let black_engine_time_increment = 0;
-  let previous_mover = "";
-  let white_time_exceeded = false;
-  let black_time_exceeded = false;
-  let previous_reality_time = -1;
+  // let previous_mover = "";
+  // let white_time_exceeded = false;
+  // let black_time_exceeded = false;
+  // let previous_reality_time = -1;
   let changing_variant_type = false;
   let clear_log = true;
   let game_list = [];
@@ -3640,7 +3718,7 @@ const App = () => {
   let engine_match_black_wins = 0;
   let engine_match_draws = 0;
   let engine_match_game_list = [];
-  let timer;
+  // let timer;
 
   let timing_system = new timing.TimingSystem([]);
 
@@ -3663,6 +3741,8 @@ const App = () => {
 
   let show_evaluation_history_graph = false;
 
+  let pgn_show_headers = false;
+
   const default_start_time = timing.DEFAULT_TIMING_SETTINGS.initial_time;
   const default_time_increment = timing.DEFAULT_TIMING_SETTINGS.increment;
   const default_byoyomi_periods =
@@ -3674,6 +3754,17 @@ const App = () => {
   const default_movetime = 500;
   const default_depth = 12;
   const default_nodes = 1000000;
+
+  const default_auto_analysis_time = 5000;
+  const auto_analysis_time_steps = [
+    1000, 2000, 5000, 10000, 15000, 20000, 30000, 60000, 120000, 300000,
+  ];
+  let auto_analysis_time_slider_value = 2;
+  let auto_analysis_started = false;
+  let auto_analysis_time = default_auto_analysis_time;
+  let integer_auto_analysis_time = default_auto_analysis_time;
+  let mainline_move_length = 0;
+  let auto_analysis_evaluation_history_graph = null;
 
   document.addEventListener("gameend", (event) => {
     finishGame(event.detail.result, event.detail.reason);
@@ -4315,7 +4406,7 @@ const App = () => {
         if (fge.state.first_engine instanceof fge.Engine) {
           fge.state.first_engine.PostMessage($("#enginecmd").value.trim());
         } else {
-          window.alert("1st engine is not loaded.");
+          window.alert("First engine is not loaded.");
         }
       } else if (window.location.hostname != "localhost") {
         window.alert("This feature is only available in offline versions.");
@@ -4329,7 +4420,7 @@ const App = () => {
         if (fge.state.second_engine instanceof fge.Engine) {
           fge.state.second_engine.PostMessage($("#enginecmd").value.trim());
         } else {
-          window.alert("2nd engine is not loaded.");
+          window.alert("Second engine is not loaded.");
         }
       } else if (window.location.hostname != "localhost") {
         window.alert("This feature is only available in offline versions.");
@@ -4407,12 +4498,12 @@ const App = () => {
     const analysisengineoutput = document.getElementById(
       "analysisengineoutput",
     );
-    let whitedepthv = parseInt($("#whitedepth").value);
-    let whitemovetimev = parseInt($("#whitemovetime").value);
-    let whitenodesv = parseInt($("#whitenodes").value);
-    let blackdepthv = parseInt($("#blackdepth").value);
-    let blackmovetimev = parseInt($("#blackmovetime").value);
-    let blacknodesv = parseInt($("#blacknodes").value);
+    let whitedepthv = -1;
+    let whitemovetimev = -1;
+    let whitenodesv = -1;
+    let blackdepthv = -1;
+    let blackmovetimev = -1;
+    let blacknodesv = -1;
     let winf = false;
     let binf = false;
     let wtime = white_engine_remaining_time;
@@ -4421,14 +4512,16 @@ const App = () => {
     let binc = black_engine_time_increment;
     if (analysis_mode) {
       let analysisargs = "";
-      if ($("#depth").validity.valid && depth > 0) {
-        analysisargs += ` depth ${depth}`;
-      }
-      if ($("#movetime").validity.valid && movetime > 0) {
-        analysisargs += ` movetime ${movetime}`;
-      }
-      if ($("#nodes").validity.valid && nodes > 0) {
-        analysisargs += ` nodes ${nodes}`;
+      if (!auto_analysis_started) {
+        if ($("#depth").validity.valid && depth > 0) {
+          analysisargs += ` depth ${depth}`;
+        }
+        if ($("#movetime").validity.valid && movetime > 0) {
+          analysisargs += ` movetime ${movetime}`;
+        }
+        if ($("#nodes").validity.valid && nodes > 0) {
+          analysisargs += ` nodes ${nodes}`;
+        }
       }
       args += analysisargs != "" ? analysisargs : " infinite";
     } else if (advanced_time_control) {
@@ -4453,23 +4546,25 @@ const App = () => {
       if (limitargs != "") {
         args += limitargs;
       }
-      if (!($("#whitedepth").validity.valid && whitedepthv > 0)) {
-        whitedepthv = -1;
+      if (engine_limit_white) {
+        if (engine_limit_white.type == "depth") {
+          whitedepthv = parseInt($("#whitedepth").value) || default_depth;
+        } else if (engine_limit_white.type == "movetime") {
+          whitemovetimev =
+            parseInt($("#whitemovetime").value) || default_movetime;
+        } else if (engine_limit_white.type == "nodes") {
+          whitenodesv = parseInt($("#whitenodes").value) || default_nodes;
+        }
       }
-      if (!($("#whitemovetime").validity.valid && whitemovetimev > 0)) {
-        whitemovetimev = -1;
-      }
-      if (!($("#whitenodes").validity.valid && whitenodesv > 0)) {
-        whitenodesv = -1;
-      }
-      if (!($("#blackdepth").validity.valid && blackdepthv > 0)) {
-        blackdepthv = -1;
-      }
-      if (!($("#blackmovetime").validity.valid && blackmovetimev > 0)) {
-        blackmovetimev = -1;
-      }
-      if (!($("#blacknodes").validity.valid && blacknodesv > 0)) {
-        blacknodesv = -1;
+      if (engine_limit_black) {
+        if (engine_limit_black.type == "depth") {
+          blackdepthv = parseInt($("#blackdepth").value) || default_depth;
+        } else if (engine_limit_black.type == "movetime") {
+          blackmovetimev =
+            parseInt($("#blackmovetime").value) || default_movetime;
+        } else if (engine_limit_black.type == "nodes") {
+          blacknodesv = parseInt($("#blacknodes").value) || default_nodes;
+        }
       }
     }
 
@@ -4584,7 +4679,8 @@ const App = () => {
                 winc,
                 btime,
                 binc,
-                white_byoyomi_time_per_period,
+                // white_byoyomi_time_per_period,
+                0,
               );
               console.log(
                 `%c Ponder %c HIT %c WHITE Ponder Hits`,
@@ -4612,7 +4708,8 @@ const App = () => {
                 winc,
                 btime,
                 binc,
-                white_byoyomi_time_per_period,
+                // white_byoyomi_time_per_period,
+                0,
               );
               //console.log("WHITE: go " + wargs);
             }
@@ -4654,7 +4751,8 @@ const App = () => {
                 winc,
                 btime,
                 binc,
-                black_byoyomi_time_per_period,
+                // black_byoyomi_time_per_period,
+                0,
               );
             }
           }
@@ -4683,7 +4781,8 @@ const App = () => {
                 winc,
                 btime,
                 binc,
-                black_byoyomi_time_per_period,
+                // black_byoyomi_time_per_period,
+                0,
               );
               console.log(
                 `%c Ponder %c HIT %c BLACK Ponder Hits`,
@@ -4711,7 +4810,8 @@ const App = () => {
                 winc,
                 btime,
                 binc,
-                white_byoyomi_time_per_period,
+                // black_byoyomi_time_per_period,
+                0,
               );
               //console.log("BLACK: go " + bargs);
             }
@@ -4753,7 +4853,8 @@ const App = () => {
                 winc,
                 btime,
                 binc,
-                white_byoyomi_time_per_period,
+                // white_byoyomi_time_per_period,
+                0,
               );
             }
           }
@@ -5320,8 +5421,8 @@ const App = () => {
 
   const scrollOutput = () => {
     //Mithril.js will automatically create a variable for an element that has ID, with its name the same as the ID
-    output2.scrollTo({
-      top: output2.scrollHeight,
+    divOutput2.scrollTo({
+      top: divOutput2.scrollHeight,
       behavior: "instant",
     });
   };
@@ -6778,7 +6879,11 @@ const App = () => {
     margin: 0,
   };
   const formatClock = (ms) => {
-    if (ms >= 60000) {
+    if (ms >= 3600000) {
+      const hours = Math.floor(ms / 3600000);
+      const minutes = (ms - hours * 3600000) / 60000;
+      return `${hours} h ${Number.isInteger(minutes) ? minutes : minutes.toFixed(1)} min`;
+    } else if (ms >= 60000) {
       const minutes = ms / 60000;
       return `${Number.isInteger(minutes) ? minutes : minutes.toFixed(1)} min`;
     }
@@ -7051,7 +7156,66 @@ const App = () => {
   ];
   const isClockModeValue = (mode) => clockModes.includes(mode);
   const isEngineSide = (game) => game.player == "fsf" || game.player == "ext";
-  const playerName = (game, fallback) => {
+  const externalEngineName = (side) => {
+    if (websocket_status != "CONNECTED") {
+      return "External engine (Backend not connected, use Fairy-Stockfish instead)";
+    }
+    if (side == "white") {
+      if (fge.state.first_engine instanceof fge.Engine) {
+        if (fge.state.first_engine.IsUsing) {
+          return `External engine (${fge.state.first_engine.Name})`;
+        } else {
+          return `External engine (Variant not supported, use Fairy-Stockfish instead)`;
+        }
+      } else {
+        return `External engine (Not loaded, use Fairy-Stockfish instead)`;
+      }
+    } else {
+      if (fge.state.second_engine instanceof fge.Engine) {
+        if (fge.state.second_engine.IsUsing) {
+          return `External engine (${fge.state.second_engine.Name})`;
+        } else {
+          return `External engine (Variant not supported, use Fairy-Stockfish instead)`;
+        }
+      } else {
+        return `External engine (Not loaded, use Fairy-Stockfish instead)`;
+      }
+    }
+  };
+  const usingExternalEngine = (side) => {
+    if (side == "white") {
+      return (
+        fge.state.first_engine instanceof fge.Engine &&
+        fge.state.first_engine.IsUsing
+      );
+    } else if (side == "black") {
+      return (
+        fge.state.second_engine instanceof fge.Engine &&
+        fge.state.second_engine.IsUsing
+      );
+    } else if (side == "analysis") {
+      return (
+        fge.state.analysis_engine instanceof fge.Engine &&
+        fge.state.analysis_engine.IsUsing
+      );
+    } else {
+      return false;
+    }
+  };
+  const engineName = (side) => {
+    if (usingExternalEngine(side)) {
+      if (side == "white") {
+        return fge.state.first_engine.Name;
+      } else if (side == "black") {
+        return fge.state.second_engine.Name;
+      } else if (side == "analysis") {
+        return fge.state.analysis_engine.Name;
+      }
+    } else {
+      return "In browser Fairy-Stockfish (WASM)";
+    }
+  };
+  const playerName = (game, fallback, side) => {
     if (app_mode != "play") {
       return fallback;
     }
@@ -7059,7 +7223,7 @@ const App = () => {
       return "Fairy-Stockfish";
     }
     if (game.player == "ext") {
-      return "External engine";
+      return externalEngineName(side);
     }
     if (game.player == "random") {
       return "Random mover";
@@ -7336,6 +7500,270 @@ const App = () => {
     }
     app_mode = "analysis";
     m.redraw();
+  };
+
+  const testVariantBranchingFactorSingleGame = (
+    variant,
+    starting_fen,
+    is960,
+    max_nodes_to_search,
+  ) => {
+    if (!ffish) {
+      return null;
+    }
+    function count_moves(moves) {
+      if (typeof moves == "string") {
+        let i = 0;
+        let count = 0;
+        for (i = 0; i < moves.length; i++) {
+          if (moves[i] == " ") {
+            count++;
+          }
+        }
+        return i == 0 ? 0 : count + 1;
+      }
+      return 0;
+    }
+    function random_between(start, end) {
+      return Math.floor(Math.random() * (end - start) + start);
+    }
+    function sub_string(string, index) {
+      if (typeof string == "string" && typeof index == "number") {
+        let i = 0;
+        let count = 0;
+        let next = -1;
+        for (i = 0; i < string.length; i++) {
+          if (count == index) {
+            next = string.indexOf(" ", i);
+            return next >= 0 ? string.substring(i, next) : string.substring(i);
+          }
+          if (string[i] == " ") {
+            count++;
+          }
+        }
+        return null;
+      }
+      return null;
+    }
+    let tmpboard = new ffish.Board(variant, starting_fen, is960);
+    let legal_moves_found = 0;
+    let nodes_searched = 0;
+    let legal_moves = "";
+    let count = 0;
+    let has_reset = true;
+    while (true) {
+      legal_moves = tmpboard.legalMoves();
+      count = count_moves(legal_moves);
+      if (count == 0 || getBoardResult(tmpboard) != "*") {
+        if (has_reset) {
+          tmpboard.delete();
+          return null;
+        }
+        tmpboard.delete();
+        tmpboard = new ffish.Board(variant, starting_fen, is960);
+        has_reset = true;
+        continue;
+      }
+      has_reset = false;
+      legal_moves_found += count;
+      if (++nodes_searched > max_nodes_to_search) {
+        tmpboard.delete();
+        return legal_moves_found / nodes_searched;
+      }
+      tmpboard.push(sub_string(legal_moves, random_between(0, count)));
+    }
+  };
+
+  const testVariantBranchingFactor = (
+    variant,
+    starting_fen,
+    is960,
+    max_nodes_to_search_per_game,
+    game_count,
+    on_progress_callback,
+  ) => {
+    let games_played = 0;
+    let branching_factor_sum = 0;
+    let timer = null;
+    const start_time = Date.now();
+    const _work = () => {
+      const ETA =
+        games_played == 0
+          ? -1
+          : ((Date.now() - start_time) / games_played) *
+            (game_count - games_played);
+      if (games_played < game_count) {
+        let result = testVariantBranchingFactorSingleGame(
+          variant,
+          starting_fen,
+          is960,
+          max_nodes_to_search_per_game,
+        );
+        if (result) {
+          branching_factor_sum += result;
+          games_played++;
+          on_progress_callback(
+            games_played == 0 ? null : branching_factor_sum / games_played,
+            games_played / game_count,
+            ETA,
+            false,
+          );
+          timer = setTimeout(_work);
+        } else {
+          on_progress_callback(null, -1, ETA, true);
+        }
+      } else {
+        on_progress_callback(
+          games_played == 0 ? null : branching_factor_sum / games_played,
+          games_played / game_count,
+          ETA,
+          true,
+        );
+      }
+    };
+    _work();
+    return () => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+  };
+
+  const startAutoAnalysis = (time, side) => {
+    if (!ffish) {
+      return;
+    }
+    const mainline_moves = gametree.GetMainLineMoveList();
+    const mainline_move_list =
+      mainline_moves == "" ? [] : mainline_moves.split(" ");
+    const eval_scores = [];
+    const san_moves = ["(Initial position)"];
+    const notation_index = simplenotations.indexOf(
+      dropdownNotationSystem[dropdownNotationSystem.selectedIndex].value,
+    );
+    const notation =
+      ffishnotationobjects[notation_index < 0 ? 2 : notation_index];
+
+    let tmpboard = new ffish.Board(
+      gametree.Variant,
+      gametree.OriginalFEN,
+      gametree.Is960,
+    );
+    let i = 0;
+    for (i = 0; i < mainline_move_list.length; i++) {
+      san_moves.push(tmpboard.sanMove(mainline_move_list[i], notation));
+      tmpboard.push(mainline_move_list[i]);
+    }
+    if (getBoardResult(tmpboard) != "*") {
+      mainline_move_list.pop(); // Do not analyze checkmated position
+    }
+    tmpboard.delete();
+
+    auto_analysis_started = true;
+    auto_analysis_handler = new autoanalysis.AutomaticAnalysisHandler(
+      time,
+      gametree.OriginalFEN.includes(" w ") ? "white" : "black",
+      mainline_move_list,
+      side,
+      (
+        eval_string,
+        symbol_to_set,
+        comment_text_after,
+        best_moves,
+        next_position_moves,
+      ) => {
+        console.log(
+          eval_string,
+          symbol_to_set,
+          comment_text_after,
+          best_moves,
+          next_position_moves,
+        );
+        gametree.CurrentMove.Move.TextAfter += `[%eval ${eval_string}]`;
+        if (symbol_to_set) {
+          gametree.CurrentMove.Move.AddSymbolText(symbol_to_set);
+        }
+        if (comment_text_after) {
+          gametree.CurrentMove.Move.TextAfter += comment_text_after;
+        }
+        if (best_moves) {
+          gametree.AddMoveListToMove(
+            gametree.CurrentMove.ParentNode(),
+            best_moves,
+          );
+        }
+        eval_scores.push(eval_string);
+        pAutoAnalysisEvaluationProgress.textContent = `Evaluating move "${san_moves[auto_analysis_handler.CurrentMoveIndex + 1]}"... (${auto_analysis_handler.CurrentMoveIndex + 1} / ${mainline_move_list.length + 1} moves analyzed, estimated remaining time: ${formatClock((mainline_move_list.length - auto_analysis_handler.CurrentMoveIndex) * (time + auto_analysis_handler.StartTimeDelay))})`;
+        if (
+          auto_analysis_evaluation_history_graph instanceof
+          evalhistory.EvaluationHistoryGraph
+        ) {
+          auto_analysis_evaluation_history_graph.SetEvaluationHistory(
+            eval_scores,
+            san_moves.slice(0, eval_scores.length),
+          );
+          auto_analysis_evaluation_history_graph.SetCurrentIndex(
+            eval_scores.length - 1,
+          );
+          auto_analysis_evaluation_history_graph.Draw();
+        }
+        if (next_position_moves) {
+          textMoves.value = next_position_moves;
+          pSetFen.click();
+        }
+      },
+      (move_to_convert, current_moves) => {
+        console.log("Current moves: ", current_moves);
+        let tmpboard = new ffish.Board(
+          gametree.Variant,
+          gametree.OriginalFEN,
+          gametree.Is960,
+        );
+        tmpboard.pushMoves(current_moves);
+        let san_move = tmpboard.sanMove(move_to_convert, notation);
+        tmpboard.delete();
+        return san_move;
+      },
+      (comment) => {
+        gametree.MoveTree.RootNode.Move.TextAfter =
+          comment + gametree.MoveTree.RootNode.Move.TextAfter;
+        stopAutoAnalysis();
+        m.redraw();
+      },
+    );
+    if (
+      !(
+        auto_analysis_evaluation_history_graph instanceof
+        evalhistory.EvaluationHistoryGraph
+      )
+    ) {
+      auto_analysis_evaluation_history_graph =
+        new evalhistory.EvaluationHistoryGraph(
+          document.getElementById("autoanalysis-evalhistory"),
+        );
+    }
+    auto_analysis_handler.AnnotateBestMoves =
+      document.getElementById("markbestmoves").checked;
+    pAutoAnalysisEvaluationProgress.textContent = `Evaluating move "${san_moves[0]}"... (0 / ${mainline_move_list.length + 1} moves analyzed, estimated remaining time: ${formatClock((mainline_move_list.length + 1) * (time + auto_analysis_handler.StartTimeDelay))})`;
+    auto_analysis_evaluation_history_graph.SetEvaluationHistory([], []);
+    auto_analysis_evaluation_history_graph.SetCurrentIndex(-1);
+    document.getElementById("autoanalysis").classList.add("hidden");
+    textMoves.value = "";
+    buttonSetFen.click();
+    setTimeout(() => {
+      setAnalysisMode(true);
+      auto_analysis_handler.StartAnalysis();
+    }, 100);
+    setTimeout(() => {
+      auto_analysis_evaluation_history_graph.Draw();
+    }, 200);
+  };
+
+  const stopAutoAnalysis = () => {
+    auto_analysis_started = false;
+    auto_analysis_handler.StopAnalysis();
+    setAnalysisMode(false);
+    updatePGNDivision(false);
   };
 
   // Board editor piece palette: mirrors the options of the (hidden)
@@ -7710,6 +8138,7 @@ const App = () => {
                 playerName(
                   game_black,
                   playerColor(mover_color_scheme, "black"),
+                  "black",
                 ),
               )
             : m(
@@ -7717,6 +8146,7 @@ const App = () => {
                 playerName(
                   game_white,
                   playerColor(mover_color_scheme, "white"),
+                  "white",
                 ),
               ),
           board_orientation == "white"
@@ -7789,6 +8219,7 @@ const App = () => {
                 playerName(
                   game_white,
                   playerColor(mover_color_scheme, "white"),
+                  "white",
                 ),
               )
             : m(
@@ -7796,6 +8227,7 @@ const App = () => {
                 playerName(
                   game_black,
                   playerColor(mover_color_scheme, "black"),
+                  "black",
                 ),
               ),
           board_orientation == "white"
@@ -8101,9 +8533,9 @@ const App = () => {
             },
             [
               m("option", { value: "DEFAULT" }, "In browser Fairy-Stockfish"),
-              m("option", { value: "WHITE" }, "1st binary engine"),
-              m("option", { value: "BLACK" }, "2nd binary engine"),
-              m("option", { value: "ANALYSIS" }, "Analysis binary engine"),
+              m("option", { value: "WHITE" }, "First external engine"),
+              m("option", { value: "BLACK" }, "Second external engine"),
+              m("option", { value: "ANALYSIS" }, "Analysis external engine"),
             ],
           ),
           m(
@@ -8210,6 +8642,32 @@ const App = () => {
                 analysis_mode ? "Engine analysis on" : "Engine analysis",
               ]),
             ],
+          ),
+          m(
+            "button.sm",
+            {
+              type: "button",
+              disabled: !is_ready || analysisBlocked(),
+              hidden: analysis_mode,
+              title:
+                "Click to setup automatic analysis which analyzes the main line moves of current game and sets annotations on the moves (e.g. Inaccuracy, Mistake, Blunder) automatically.",
+              onclick: () => {
+                const main_line_move_list = gametree.GetMainLineMoveList();
+                if (main_line_move_list == "") {
+                  mainline_move_length = 1;
+                } else {
+                  mainline_move_length =
+                    main_line_move_list.split(" ").length + 1;
+                }
+                auto_analysis_time = use_integer_inputs
+                  ? integer_auto_analysis_time
+                  : auto_analysis_time_steps[auto_analysis_time_slider_value];
+                document
+                  .getElementById("autoanalysis")
+                  .classList.remove("hidden");
+              },
+            },
+            "Automatic Analysis Setup",
           ),
           m("div", { hidden: !analysis_mode }, [
             m(
@@ -8324,17 +8782,12 @@ const App = () => {
           }),
         ]),
         m("div#evalhistory", { hidden: !show_evaluation_history_graph }, [
-          m(
-            "span.label",
-            {
-              onclick: () => {
-                window.alert(
-                  "(Assuming you use left button as primary mouse button)\nUsage:\nDrag on the graph to pan.\nRight click on the graph to reset view.\nLeft click the points to show move information.\nRight click the points to display that position.",
-                );
-              },
-            },
-            "Evaluation History",
-          ),
+          m("span.label", [
+            "Evaluation History ",
+            helpButton(
+              "(Assuming you use left button as primary mouse button)\nUsage:\nDrag on the graph to pan.\nRight click on the graph to reset view.\nLeft click the points to show move information.\nRight click the points to display that position.",
+            ),
+          ]),
           m("div#evalhistorycontainer"),
         ]),
         m(
@@ -8897,8 +9350,9 @@ const App = () => {
                 ),
               ]),
               m("div#whiteenginesettings", [
-                m("p", "1st binary engine (First mover)"),
+                m("p", `First engine (First mover) is: ${engineName("white")}`),
                 m("input[type=number]#whitedepth", {
+                  hidden: true,
                   placeholder: "Depth",
                   title:
                     "The maximum depth that the engine is allowed to search.",
@@ -8907,8 +9361,12 @@ const App = () => {
                     websocket_status != "CONNECTED" ||
                     analysis_mode,
                   min: 1,
+                  value: use_integer_inputs
+                    ? integer_input_white_depth
+                    : depthSteps[game_white.depth],
                 }),
                 m("input[type=number]#whitemovetime", {
+                  hidden: true,
                   placeholder: "Movetime (ms)",
                   title:
                     "The time in milliseconds that the engine can think at most.",
@@ -8917,8 +9375,12 @@ const App = () => {
                     websocket_status != "CONNECTED" ||
                     analysis_mode,
                   min: 0,
+                  value: use_integer_inputs
+                    ? integer_input_white_movetime
+                    : movetimeSteps[game_white.movetime],
                 }),
                 m("input[type=number]#whitenodes", {
+                  hidden: true,
                   placeholder: "Nodes",
                   title: "The number of moves that the engine should search.",
                   disabled:
@@ -8926,16 +9388,23 @@ const App = () => {
                     websocket_status != "CONNECTED" ||
                     analysis_mode,
                   min: 1,
+                  value: use_integer_inputs
+                    ? integer_input_white_nodes
+                    : nodesSteps[game_white.nodes],
                 }),
                 m(
                   "p#whiteunsupportedvariant",
                   { hidden: true },
-                  "1st engine does not support this variant. In browser Fairy-Stockfish will be used instead.",
+                  "First engine does not support this variant. In browser Fairy-Stockfish will be used instead.",
                 ),
               ]),
               m("div#blackenginesettings", [
-                m("p", "2nd binary engine (Second mover)"),
+                m(
+                  "p",
+                  `Second engine (Second mover) is: ${engineName("black")}`,
+                ),
                 m("input[type=number]#blackdepth", {
+                  hidden: true,
                   placeholder: "Depth",
                   title:
                     "The maximum depth that the engine is allowed to search.",
@@ -8944,8 +9413,12 @@ const App = () => {
                     websocket_status != "CONNECTED" ||
                     analysis_mode,
                   min: 1,
+                  value: use_integer_inputs
+                    ? integer_input_black_depth
+                    : depthSteps[game_black.depth],
                 }),
                 m("input[type=number]#blackmovetime", {
+                  hidden: true,
                   placeholder: "Movetime (ms)",
                   title:
                     "The time in milliseconds that the engine can think at most.",
@@ -8954,8 +9427,12 @@ const App = () => {
                     websocket_status != "CONNECTED" ||
                     analysis_mode,
                   min: 0,
+                  value: use_integer_inputs
+                    ? integer_input_black_movetime
+                    : movetimeSteps[game_black.movetime],
                 }),
                 m("input[type=number]#blacknodes", {
+                  hidden: true,
                   placeholder: "Nodes",
                   title: "The number of moves that the engine should search.",
                   disabled:
@@ -8963,14 +9440,21 @@ const App = () => {
                     websocket_status != "CONNECTED" ||
                     analysis_mode,
                   min: 1,
+                  value: use_integer_inputs
+                    ? integer_input_black_nodes
+                    : nodesSteps[game_black.nodes],
                 }),
                 m(
                   "p#blackunsupportedvariant",
                   { hidden: true },
-                  "2nd engine does not support this variant. In browser Fairy-Stockfish will be used instead.",
+                  "Second engine does not support this variant. In browser Fairy-Stockfish will be used instead.",
                 ),
               ]),
               m("div#analysisenginesettings", [
+                m(
+                  "p",
+                  `Analysis engine (Used in analysis) is: ${engineName("analysis")}`,
+                ),
                 m(
                   "p#analysisunsupportedvariant",
                   { hidden: true },
@@ -9081,7 +9565,8 @@ const App = () => {
             ),
             m("input#engineoutputline", { hidden: true }),
             m("input[type=number]#gameendstatus", {
-              placeholder: "Stores value that the side that run out of time",
+              placeholder:
+                "Stores value of non-normal game ends (Time forfeit, adjudication, ...)",
               hidden: true,
             }),
             m(
@@ -10661,8 +11146,10 @@ const App = () => {
                     disabled: !externalAvailable,
                   },
                   externalAvailable
-                    ? "External engine"
-                    : "External engine (not connected)",
+                    ? side == "white"
+                      ? externalEngineName("white")
+                      : externalEngineName("black")
+                    : "External engine (Backend not connected)",
                 ),
               ],
             ),
@@ -11837,6 +12324,29 @@ const App = () => {
               "div.setting",
               {
                 title:
+                  "When checked, display header information (Event, site, ...) at the top of the move list panel.",
+                hidden: !advanced_pgn_mode,
+              },
+              [
+                m(
+                  "span",
+
+                  "Show headers in PGN",
+                ),
+                m("input[type=checkbox]#pgnshowheaders", {
+                  checked: pgn_show_headers,
+                  disabled: !is_ready,
+                  onclick: () => {
+                    pgn_show_headers = !pgn_show_headers;
+                    localStorage.setItem("PGNShowHeaders", pgn_show_headers);
+                  },
+                }),
+              ],
+            ),
+            m(
+              "div.setting",
+              {
+                title:
                   "If you cannot make your move on the board, you can open this dialog to make the move.",
               },
               [
@@ -12759,6 +13269,122 @@ const App = () => {
           m("button#pgntextsave.primary", { type: "button" }, "Save"),
         ]),
       ]),
+      m("div#autoanalysis.hidden.popup", [
+        m("p.title", "Automatic Analysis"),
+        m(
+          "p.hint",
+          "Note: It's recommended to load NNUE models for Fairy-Stockfish to get most accurate results. If you have loaded an analysis external engine which supports current variant, that engine will be used for analysis. To change threads, hash or multipv settings of the external engine, please go to engine management and change the options (Threads, Hash and MultiPV) of that engine.",
+        ),
+        m("div", [
+          m("p", "Engine analysis time per move:"),
+          use_integer_inputs
+            ? integerInput(
+                "Time per move (ms)",
+                "1",
+                "",
+                "",
+                (value) => {
+                  integer_auto_analysis_time =
+                    value || default_auto_analysis_time;
+                  auto_analysis_time = integer_auto_analysis_time;
+                },
+                "Search time in milliseconds per move for analysis. Longer time gives you more accurate results but takes longer time.",
+              )
+            : sliderRow(
+                "Time per move",
+                formatClock(
+                  auto_analysis_time_steps[auto_analysis_time_slider_value],
+                ),
+                0,
+                auto_analysis_time_steps.length - 1,
+                auto_analysis_time_slider_value,
+                (value) => {
+                  auto_analysis_time_slider_value = value;
+                  auto_analysis_time =
+                    auto_analysis_time_steps[auto_analysis_time_slider_value];
+                },
+                "Search time per move for analysis. Longer time gives you more accurate results but takes longer time.",
+              ),
+        ]),
+        m(
+          "p",
+          "Annotate moves (Add ?!, ? or ?? symbols, best moves, etc.) on which player:",
+        ),
+        m(
+          "select#autoanalysis-side",
+          {
+            title:
+              "Choose which player to annotate play quality comments and marks on. Evaluations are always set for both players.",
+          },
+          [
+            m("option", { value: "both" }, "Both"),
+            m("option", { value: "white" }, "First mover"),
+            m("option", { value: "black" }, "Second mover"),
+          ],
+        ),
+        m(
+          "label#label-markbestmoves.toggle",
+          {
+            title:
+              "When checked, automatic analysis will add annotations to moves that matches engine's best move. This can help you find moves that are not considered as bad moves which immediately lower your evaluation (which players whose ELO between 800-1400 should learn to avoid), but slowly degrade your evaluation in the game when these moves are put together (which players whose ELO above 1400 should learn to improve).",
+          },
+          [
+            m("input[type=checkbox]#markbestmoves.box"),
+            m("span", "Annotate best moves"),
+          ],
+        ),
+        m(
+          "p#autoanalysis-estimatedtime",
+          `Estimated time: ${formatClock(auto_analysis_time * mainline_move_length)}`,
+        ),
+        m("div#autoanalysis-control", [
+          m(
+            "button#autoanalysis-cancel.ghost",
+            {
+              type: "button",
+              onclick: () => {
+                document.getElementById("autoanalysis").classList.add("hidden");
+              },
+            },
+            "Cancel",
+          ),
+          m(
+            "button#autoanalysis-start.primary",
+            {
+              type: "button",
+              onclick: () => {
+                auto_analysis_time = use_integer_inputs
+                  ? integer_auto_analysis_time
+                  : auto_analysis_time_steps[auto_analysis_time_slider_value];
+                startAutoAnalysis(
+                  auto_analysis_time,
+                  document.getElementById("autoanalysis-side").value,
+                );
+              },
+            },
+            "Start",
+          ),
+        ]),
+      ]),
+      m("div.popup", { hidden: !auto_analysis_started }, [
+        m("p.title", "Automatic Analysis Running..."),
+        m(
+          "p.hint",
+          "Automatic analysis is running, please wait. This dialog will close automatically after analysis finished.",
+        ),
+        m("p#autoanalysis-evalprogress"),
+        m("div#autoanalysis-evalhistory"),
+        m(
+          "button#autoanalysis-stop.danger",
+          {
+            type: "button",
+            title: "Click to stop automatic analysis immediately.",
+            onclick: stopAutoAnalysis,
+          },
+          "Stop",
+        ),
+      ]),
+      m("div#autoanalysis-blocker", { hidden: !auto_analysis_started }),
       m("div#themedetectorcontainer"),
       m("div#tempbackground1.pagebackground"),
       m("div#tempbackground2.pagebackground.show"),
@@ -13024,10 +13650,18 @@ const buttonAnalyzeRecommendedMove = document.getElementById(
 );
 const divPgnContainer = document.getElementById("pgn-container");
 const dropdownPGNStyle = document.getElementById("pgnstyle");
+const checkboxPGNShowHeaders = document.getElementById("pgnshowheaders");
 const dropdownBoardCoordinate = document.getElementById("boardcoordinate");
 const checkboxFischerRandom = document.getElementById("isfischerrandommode");
 const checkBoxInnerCoordinate = document.getElementById(
   "check-innercoordinate",
+);
+const divOutput2 = document.getElementById("output2");
+const pAutoAnalysisEvaluationProgress = document.getElementById(
+  "autoanalysis-evalprogress",
+);
+const divAutoAnalysisEvaluationGraph = document.getElementById(
+  "autoanalysis-evalhistory",
 );
 const soundMove = new Audio("assets/sound/thearst3rd/move.mp3");
 const soundCapture = new Audio("assets/sound/thearst3rd/capture.mp3");
@@ -13162,7 +13796,7 @@ class MultiplePrincipalVariationMiniBoardHandler {
       }
     }
     selected.IsValid = true;
-    selected.HeaderString = `${PrincipalVariationNumber == 1 ? "" : "<hr />"}<evalnum>${evaluation}</evalnum><span class="pvmeta">d${Depth > -1 ? Depth : "?"}/${SelectiveDepth > -1 ? SelectiveDepth : "?"}</span> `;
+    selected.HeaderString = `${PrincipalVariationNumber == 1 ? "" : "<hr />"}<evalnum title="${analysisutil.GetEvaluationDescription(EvaluationNumber, IsMate)}">${evaluation}</evalnum><span class="pvmeta">d${Depth > -1 ? Depth : "?"}/${SelectiveDepth > -1 ? SelectiveDepth : "?"}</span> `;
     selected.Variant = VariantID;
     selected.Is960 = Is960;
     selected.FEN = CurrentBoardFEN;
@@ -13374,39 +14008,6 @@ for (i = 0; i < maxmultipvcount; i++) {
 }
 
 document.dispatchEvent(new Event("onpageload"));
-
-function getEvaluationDescription(eval_num, is_mate) {
-  const better_side = eval_num > 0 ? "First" : eval_num < 0 ? "Second" : "none";
-  const score = Math.abs(eval_num);
-  if (isNaN(eval_num)) {
-    return "Invalid evaluation";
-  }
-  if (is_mate) {
-    if (eval_num == 0) {
-      return "The game has ended";
-    } else {
-      return `${better_side} mover can win in ${score} move(s)`;
-    }
-  } else {
-    if (score < 0.2) {
-      return "The position is equal";
-    } else if (score < 0.4) {
-      return `${better_side} mover is minimally better`;
-    } else if (score < 0.8) {
-      return `${better_side} mover is slightly better`;
-    } else if (score < 1.5) {
-      return `${better_side} mover is better`;
-    } else if (score < 2.5) {
-      return `${better_side} mover is clearly better`;
-    } else if (score < 5) {
-      return `${better_side} mover has a decisive advantage`;
-    } else if (score < 10) {
-      return `${better_side} mover is winning`;
-    } else {
-      return `${better_side} mover is clearly winning`;
-    }
-  }
-}
 
 function convertChessgroundXKeyToSquare(key) {
   const ranks = [
@@ -15772,27 +16373,7 @@ new Module().then((loadedModule) => {
 
   buttonMoveTreeSave.onclick = function () {
     let result = "";
-    let whitename = "";
-    let blackname = "";
-    if (playWhite.checked) {
-      if (fge.state.first_engine instanceof fge.Engine) {
-        whitename = fge.state.first_engine.Name;
-      } else {
-        whitename = "In browser Fairy-Stockfish";
-      }
-    } else {
-      whitename = "Human Player";
-    }
-    if (playBlack.checked) {
-      if (fge.state.second_engine instanceof fge.Engine) {
-        blackname = fge.state.second_engine.Name;
-      } else {
-        blackname = "In browser Fairy-Stockfish";
-      }
-    } else {
-      blackname = "Human Player";
-    }
-    result = gametree.GetHeaderString(whitename, blackname);
+    result = gametree.GetHeaderString("?", "?");
     result += "\n\n" + gametree.ToString(ffish.Notation.SAN, true) + "\n";
     DownloadFile(result, "game.pgn", "text/plain");
   };
@@ -16139,8 +16720,11 @@ new Module().then((loadedModule) => {
     gameStatus.innerText = result;
   };
 
-  setPgnString.onclick = function () {
-    let tokens = setPgnString.value.split("\x01");
+  setPgnString.addEventListener("setpos", (event) => {
+    if (!(event instanceof CustomEvent)) {
+      return;
+    }
+    let tokens = event.detail.split("\x01");
     let result = pgnutil.ParsePGNMovesToMoveTree(
       tokens[2],
       board.variant(),
@@ -16179,7 +16763,7 @@ new Module().then((loadedModule) => {
         "There is a problem when parsing the PGN. Press Ctrl+Shift+I to see what's going on.",
       );
     }
-  };
+  });
 
   buttonGameStart.onclick = function () {
     if (
@@ -16725,7 +17309,7 @@ new Module().then((loadedModule) => {
         evalscore.innerText = "Checkmate";
       }
       last_evaluation = "#0";
-      evalcomment.textContent = getEvaluationDescription(0, true);
+      evalcomment.textContent = analysisutil.GetEvaluationDescription(0, true);
       return;
     } else {
       return;
@@ -16768,7 +17352,15 @@ new Module().then((loadedModule) => {
           }
           last_evaluation = "#0";
         }
-        evalcomment.textContent = getEvaluationDescription(matemoves, true);
+        auto_analysis_handler.OnEngineEvaluationMessage(
+          matemoves,
+          true,
+          multipvrecord[bestpv][4],
+        );
+        evalcomment.textContent = analysisutil.GetEvaluationDescription(
+          matemoves,
+          true,
+        );
       }
     } else {
       evaluation = multipvrecord[bestpv][1];
@@ -16790,7 +17382,15 @@ new Module().then((loadedModule) => {
         } else {
           evaluationBar.style.width = `${parseInt((evaluation * 100 + 1000) / 20)}%`;
         }
-        evalcomment.textContent = getEvaluationDescription(evaluation, false);
+        auto_analysis_handler.OnEngineEvaluationMessage(
+          evaluation,
+          false,
+          multipvrecord[bestpv][4],
+        );
+        evalcomment.textContent = analysisutil.GetEvaluationDescription(
+          evaluation,
+          false,
+        );
       }
     }
     bestmove = multipvrecord[bestpv][2];
@@ -17212,6 +17812,10 @@ new Module().then((loadedModule) => {
   };
 
   dropdownPGNStyle.addEventListener("change", () => {
+    updatePGNDivision(false);
+  });
+
+  checkboxPGNShowHeaders.addEventListener("change", () => {
     updatePGNDivision(false);
   });
 
@@ -18320,6 +18924,7 @@ function getPgnDiv(board) {
       ffishnotationobjects[notationindex],
       dropdownPGNStyle[dropdownPGNStyle.selectedIndex].value,
       chessground.state.orientation,
+      checkboxPGNShowHeaders.checked,
     );
   }
 }
