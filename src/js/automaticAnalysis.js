@@ -88,25 +88,25 @@ export class AutomaticAnalysisHandler {
     function text_style(type) {
       if (type == 0) {
         // Blunder
-        return "[%css color: var(--disastrous-move-color); font-weight: bold; font-style: normal; border-left: 5px solid var(--disastrous-move-color); padding-left: 3px;]";
+        return "[%css color: var(--disastrous-move-color); font-weight: bold; font-style: normal; border-left: 5px solid var(--disastrous-move-color); padding-left: 3px;][%mcss color: var(--disastrous-move-color);]";
       } else if (type == 1) {
         // Mistake
-        return "[%css color: var(--bad-move-color); font-weight: bold; font-style: normal; border-left: 5px solid var(--bad-move-color); padding-left: 3px;]";
+        return "[%css color: var(--bad-move-color); font-weight: bold; font-style: normal; border-left: 5px solid var(--bad-move-color); padding-left: 3px;][%mcss color: var(--bad-move-color);]";
       } else if (type == 2) {
         // Inaccuracy
-        return "[%css color: var(--dubious-move-color); font-weight: bold; font-style: normal; border-left: 5px solid var(--dubious-move-color); padding-left: 3px;]";
+        return "[%css color: var(--dubious-move-color); font-weight: bold; font-style: normal; border-left: 5px solid var(--dubious-move-color); padding-left: 3px;][%mcss color: var(--dubious-move-color);]";
       } else if (type == 3) {
         // Interesting
-        return "[%css color: var(--interesting-move-color); font-weight: bold; font-style: normal; border-left: 5px solid var(--interesting-move-color); padding-left: 3px;]";
+        return "[%css color: var(--interesting-move-color); font-weight: bold; font-style: normal; border-left: 5px solid var(--interesting-move-color); padding-left: 3px;][%mcss color: var(--interesting-move-color);]";
       } else if (type == 4) {
         // Good
-        return "[%css color: var(--good-move-color); font-weight: bold; font-style: normal; border-left: 5px solid var(--good-move-color); padding-left: 3px;]";
+        return "[%css color: var(--good-move-color); font-weight: bold; font-style: normal; border-left: 5px solid var(--good-move-color); padding-left: 3px;][%mcss color: var(--good-move-color);]";
       } else if (type == 5) {
         // Brilliant
-        return "[%css color: var(--brilliant-move-color); font-weight: bold; font-style: normal; border-left: 5px solid var(--brilliant-move-color); padding-left: 3px;]";
+        return "[%css color: var(--brilliant-move-color); font-weight: bold; font-style: normal; border-left: 5px solid var(--brilliant-move-color); padding-left: 3px;][%mcss color: var(--brilliant-move-color);]";
       } else if (type == 6) {
         // Best move
-        return "[%css color: var(--best-move-color); font-weight: bold; font-style: normal; border-left: 5px solid var(--best-move-color); padding-left: 3px;]";
+        return "[%css color: var(--best-move-color); font-weight: bold; font-style: normal; border-left: 5px solid var(--best-move-color); padding-left: 3px;][%mcss color: var(--best-move-color);]";
       } else {
         return "";
       }

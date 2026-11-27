@@ -3019,6 +3019,7 @@ div.popup textarea {
 #autoanalysis-evalhistory {
   position: relative;
   height: 200px;
+  cursor: move;
 }
 
 #imagegenerationprogress {

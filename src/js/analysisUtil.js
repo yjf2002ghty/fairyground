@@ -1,8 +1,8 @@
 export function EvaluationToString(eval_num, is_mate) {
   if (is_mate) {
-    return `#${eval_num > 0 ? "+" : ""}${eval_num}`;
+    return `#${eval_num > 0 ? "+" : ""}${parseInt(eval_num)}`;
   } else {
-    return `${eval_num > 0 ? "+" : ""}${eval_num}`;
+    return `${eval_num > 0 ? "+" : ""}${eval_num.toFixed(2)}`;
   }
 }
 
@@ -20,11 +20,12 @@ export function GetEvaluationLevelDifference(
     ? 1000000 / eval_num_before
     : eval_num_before;
   let eval_after = is_mate_after ? 1000000 / eval_num_after : eval_num_after;
-  if (is_first_mover) {
-    return Math.floor(sigmoid(eval_after) - sigmoid(eval_before));
-  } else {
-    return Math.ceil(sigmoid(eval_before) - sigmoid(eval_after));
-  }
+  let eval_difference = is_first_mover
+    ? sigmoid(eval_after) - sigmoid(eval_before)
+    : sigmoid(eval_before) - sigmoid(eval_after);
+  return eval_difference >= 0
+    ? Math.floor(eval_difference)
+    : Math.ceil(eval_difference);
 }
 
 export function GetEvaluationDescription(eval_num, is_mate) {

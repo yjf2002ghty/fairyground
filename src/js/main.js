@@ -1076,6 +1076,7 @@ class GameTree {
     let terminationstr;
     let evalstr = "";
     let text_css = "";
+    let move_css = "";
     let pgn_container_vnodes = [];
     let vnode_types = [];
     let previous_onclick_handler = null;
@@ -1173,6 +1174,8 @@ class GameTree {
           continue;
         }
         if (i > 0 && tokens[i].Move.TextBefore) {
+          parsedtext = moveutil.ParseTextActions(tokens[i].Move.TextBefore);
+          text_css = parsedtext.get("css") ?? "";
           displaytextbefore = tokens[i].Move.TextBefore.replace(
             MoveTextActionPartsMatcher,
             "",
@@ -1183,6 +1186,7 @@ class GameTree {
             pgn_container_vnodes.push(
               m(
                 `p.text-before${tokens[i].Move.TextBefore.includes("\n") ? ".full-line" : ""}`,
+                { style: text_css },
                 displaytextbefore,
               ),
             );
@@ -1293,6 +1297,11 @@ class GameTree {
           terminationstr = (parsedtext.get("end") ?? "").split(",");
           evalstr = parsedtext.get("eval") ?? "";
           text_css = parsedtext.get("css") ?? "";
+          move_css = parsedtext.get("mcss");
+          if (i > 0 && move_css) {
+            pgn_container_vnodes[pgn_container_vnodes.length - 1].attrs.style =
+              move_css;
+          }
           if (evalstr) {
             if (evalstr.startsWith("#")) {
               pgn_container_vnodes.push(
@@ -7502,7 +7511,7 @@ const App = () => {
     m.redraw();
   };
 
-  const testVariantBranchingFactorSingleGame = (
+  const getVarianStatisticsSingleGame = (
     variant,
     starting_fen,
     is960,
@@ -7547,34 +7556,38 @@ const App = () => {
     }
     let tmpboard = new ffish.Board(variant, starting_fen, is960);
     let legal_moves_found = 0;
+    let depth = 0;
     let nodes_searched = 0;
     let legal_moves = "";
     let count = 0;
-    let has_reset = true;
+    if (getBoardResult(tmpboard) != "*" || tmpboard.legalMoves() == "") {
+      tmpboard.delete();
+      return null;
+    }
     while (true) {
       legal_moves = tmpboard.legalMoves();
       count = count_moves(legal_moves);
       if (count == 0 || getBoardResult(tmpboard) != "*") {
-        if (has_reset) {
-          tmpboard.delete();
-          return null;
-        }
         tmpboard.delete();
-        tmpboard = new ffish.Board(variant, starting_fen, is960);
-        has_reset = true;
-        continue;
+        return {
+          branching_factor: legal_moves_found / nodes_searched,
+          depth: depth,
+        };
       }
-      has_reset = false;
       legal_moves_found += count;
       if (++nodes_searched > max_nodes_to_search) {
         tmpboard.delete();
-        return legal_moves_found / nodes_searched;
+        return {
+          branching_factor: legal_moves_found / nodes_searched,
+          depth: depth,
+        };
       }
+      depth++;
       tmpboard.push(sub_string(legal_moves, random_between(0, count)));
     }
   };
 
-  const testVariantBranchingFactor = (
+  const getVariantStatistics = (
     variant,
     starting_fen,
     is960,
@@ -7584,6 +7597,7 @@ const App = () => {
   ) => {
     let games_played = 0;
     let branching_factor_sum = 0;
+    let depth_sum = 0;
     let timer = null;
     const start_time = Date.now();
     const _work = () => {
@@ -7593,28 +7607,31 @@ const App = () => {
           : ((Date.now() - start_time) / games_played) *
             (game_count - games_played);
       if (games_played < game_count) {
-        let result = testVariantBranchingFactorSingleGame(
+        let result = getVarianStatisticsSingleGame(
           variant,
           starting_fen,
           is960,
           max_nodes_to_search_per_game,
         );
         if (result) {
-          branching_factor_sum += result;
+          branching_factor_sum += result.branching_factor;
+          depth_sum += result.depth;
           games_played++;
           on_progress_callback(
             games_played == 0 ? null : branching_factor_sum / games_played,
+            games_played == 0 ? null : depth_sum / games_played,
             games_played / game_count,
             ETA,
             false,
           );
           timer = setTimeout(_work);
         } else {
-          on_progress_callback(null, -1, ETA, true);
+          on_progress_callback(null, null, -1, ETA, true);
         }
       } else {
         on_progress_callback(
           games_played == 0 ? null : branching_factor_sum / games_played,
+          games_played == 0 ? null : depth_sum / games_played,
           games_played / game_count,
           ETA,
           true,
@@ -12250,7 +12267,7 @@ const App = () => {
               ],
             ),
             m("div.setting", { hidden: !advanced_pgn_mode }, [
-              m("span", "PGN Display style"),
+              m("span", "PGN: Display style"),
               m(
                 "select#pgnstyle.sm",
                 {
@@ -12331,7 +12348,7 @@ const App = () => {
                 m(
                   "span",
 
-                  "Show headers in PGN",
+                  "PGN: Show headers",
                 ),
                 m("input[type=checkbox]#pgnshowheaders", {
                   checked: pgn_show_headers,
@@ -13288,7 +13305,7 @@ const App = () => {
                     value || default_auto_analysis_time;
                   auto_analysis_time = integer_auto_analysis_time;
                 },
-                "Search time in milliseconds per move for analysis. Longer time gives you more accurate results but takes longer time.",
+                "Search time in milliseconds per move for analysis. Longer time per move gives you more accurate results but takes longer time to complete whole analysis.",
               )
             : sliderRow(
                 "Time per move",
@@ -13303,7 +13320,7 @@ const App = () => {
                   auto_analysis_time =
                     auto_analysis_time_steps[auto_analysis_time_slider_value];
                 },
-                "Search time per move for analysis. Longer time gives you more accurate results but takes longer time.",
+                "Search time per move for analysis. Longer time per move gives you more accurate results but takes longer time to complete whole analysis.",
               ),
         ]),
         m(
@@ -13326,7 +13343,7 @@ const App = () => {
           "label#label-markbestmoves.toggle",
           {
             title:
-              "When checked, automatic analysis will add annotations to moves that matches engine's best move. This can help you find moves that are not considered as bad moves which immediately lower your evaluation (which players whose ELO between 800-1400 should learn to avoid), but slowly degrade your evaluation in the game when these moves are put together (which players whose ELO above 1400 should learn to improve).",
+              "When checked, automatic analysis will add annotations to moves that matches engine's best move. This can help you find moves that are not considered as bad moves which immediately lower your evaluation, but slowly degrade your evaluation in the game when these moves are put together.",
           },
           [
             m("input[type=checkbox]#markbestmoves.box"),
@@ -13781,20 +13798,7 @@ class MultiplePrincipalVariationMiniBoardHandler {
     }
     let selected =
       this.PrincipalVariationDataList[PrincipalVariationNumber - 1];
-    let evaluation = "";
-    if (IsMate) {
-      if (EvaluationNumber > 0) {
-        evaluation = `#+${parseInt(EvaluationNumber)}`;
-      } else {
-        evaluation = `#${parseInt(EvaluationNumber)}`;
-      }
-    } else {
-      if (EvaluationNumber > 0) {
-        evaluation = `+${EvaluationNumber.toFixed(2)}`;
-      } else {
-        evaluation = `${EvaluationNumber.toFixed(2)}`;
-      }
-    }
+    let evaluation = analysisutil.EvaluationToString(EvaluationNumber, IsMate);
     selected.IsValid = true;
     selected.HeaderString = `${PrincipalVariationNumber == 1 ? "" : "<hr />"}<evalnum title="${analysisutil.GetEvaluationDescription(EvaluationNumber, IsMate)}">${evaluation}</evalnum><span class="pvmeta">d${Depth > -1 ? Depth : "?"}/${SelectiveDepth > -1 ? SelectiveDepth : "?"}</span> `;
     selected.Variant = VariantID;
@@ -17235,20 +17239,11 @@ new Module().then((loadedModule) => {
         let pvinfostr = "";
         let showevalnum = "";
         for (k = 0; k < recordedmultipv; k++) {
-          if (multipvrecord[k][0]) {
-            if (multipvrecord[k][1] > 0) {
-              showevalnum = `#+${parseInt(multipvrecord[k][1])}`;
-            } else {
-              showevalnum = `#${parseInt(multipvrecord[k][1])}`;
-            }
-          } else {
-            if (multipvrecord[k][1] > 0) {
-              showevalnum = `+${multipvrecord[k][1].toFixed(2)}`;
-            } else {
-              showevalnum = multipvrecord[k][1].toFixed(2).toString();
-            }
-          }
-          pvinfostr += `${k > 0 ? "<hr />" : ""}<evalnum>${showevalnum}</evalnum><span class="pvmeta">d${multipvrecord[k][5] > -1 ? multipvrecord[k][5] : "?"}/${multipvrecord[k][6] > -1 ? multipvrecord[k][6] : "?"}</span> ${getNotation(
+          showevalnum = analysisutil.EvaluationToString(
+            multipvrecord[k][1],
+            multipvrecord[k][0],
+          );
+          pvinfostr += `${k > 0 ? "<hr />" : ""}<evalnum title="${analysisutil.GetEvaluationDescription(multipvrecord[k][1], multipvrecord[k][0])}">${showevalnum}</evalnum><span class="pvmeta">d${multipvrecord[k][5] > -1 ? multipvrecord[k][5] : "?"}/${multipvrecord[k][6] > -1 ? multipvrecord[k][6] : "?"}</span> ${getNotation(
             dropdownNotationSystem[dropdownNotationSystem.selectedIndex].value,
             board.variant(),
             board.fen(),
